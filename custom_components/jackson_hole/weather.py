@@ -1,7 +1,7 @@
-"""Weather platform for Jackson Hole Mountain Resort."""
+"""Weather entity for Jackson Hole Mountain Resort."""
 from __future__ import annotations
-from datetime import datetime
-import logging
+
+from datetime import datetime, time
 from typing import Any
 
 from homeassistant.components.weather import (
@@ -9,169 +9,114 @@ from homeassistant.components.weather import (
     WeatherEntity,
     WeatherEntityFeature,
 )
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import UnitOfTemperature, UnitOfSpeed
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.const import UnitOfSpeed, UnitOfTemperature
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.util import dt as dt_util
 
-from .const import (
-    DOMAIN,
-    MANUFACTURER,
-    MODEL,
-    ATTRIBUTION,
-    WEATHER_CONDITION_MAP,
-)
-from .coordinator import JacksonHoleDataUpdateCoordinator
+from .api import child, measure, parse_date, section, to_number
+from .const import CONF_CREATE_WEATHER_ENTITY, RESORT_TIME_ZONE, WEATHER_CONDITION_MAP
+from .coordinator import JacksonHoleConfigEntry, JacksonHoleCoordinator, entry_config
+from .entity import JacksonHoleEntity
 
-_LOGGER = logging.getLogger(__name__)
+type Data = dict[str, Any]
+
+
+def map_condition(icon: Any) -> str | None:
+    """Map a feed icon class like 'icon-svg_sun' to an HA condition."""
+    if not isinstance(icon, str) or not icon:
+        return None
+    return WEATHER_CONDITION_MAP.get(icon.strip())
+
+
+def _days(data: Data) -> list[dict[str, Any]]:
+    days = child(data, "forecast", "midMountain", "days")
+    if not isinstance(days, list):
+        return []
+    return [day for day in days if isinstance(day, dict)]
+
+
+def build_forecast(data: Data) -> list[Forecast]:
+    """Daily forecast for mid-mountain, dated midnight resort time."""
+    tz = dt_util.get_time_zone(RESORT_TIME_ZONE)
+    forecast: list[Forecast] = []
+    for day in _days(data):
+        if (when := parse_date(day.get("date"))) is None:
+            continue
+        item = Forecast(
+            datetime=datetime.combine(when, time.min, tzinfo=tz).isoformat(),
+            condition=map_condition(day.get("icon")),
+            native_temperature=measure(day, "highTemperature"),
+            native_templow=measure(day, "lowTemperature"),
+        )
+        wind = section(day, "wind")
+        if (speed := to_number(wind.get("valueMin"))) is not None:
+            item["native_wind_speed"] = speed
+        if direction := wind.get("direction"):
+            item["wind_bearing"] = direction
+        if (chance := measure(day, "precipitationChance")) is not None:
+            item["precipitation_probability"] = int(chance)
+        forecast.append(item)
+    return forecast
 
 
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback,
+    hass: HomeAssistant,
+    entry: JacksonHoleConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up Jackson Hole weather entity."""
-    coordinator: JacksonHoleDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
-    if entry.data.get("create_weather_entity", True):
-        async_add_entities([JacksonHoleWeather(coordinator)])
+    """Set up the weather entity."""
+    if entry_config(entry)[CONF_CREATE_WEATHER_ENTITY]:
+        async_add_entities([JacksonHoleWeather(entry.runtime_data)])
 
 
-class JacksonHoleWeather(CoordinatorEntity, WeatherEntity):
-    """Weather entity for Jackson Hole Mountain Resort."""
+class JacksonHoleWeather(JacksonHoleEntity, WeatherEntity):
+    """Mid-mountain conditions and the resort's daily forecast."""
 
-    _attr_attribution = ATTRIBUTION
-    _attr_has_entity_name = True
-    _attr_name = "Weather"
+    _attr_translation_key = "weather"
     _attr_native_temperature_unit = UnitOfTemperature.FAHRENHEIT
     _attr_native_wind_speed_unit = UnitOfSpeed.MILES_PER_HOUR
     _attr_supported_features = WeatherEntityFeature.FORECAST_DAILY
 
-    def __init__(self, coordinator: JacksonHoleDataUpdateCoordinator) -> None:
-        """Initialize the weather entity."""
-        super().__init__(coordinator)
-        self._attr_unique_id = "jackson_hole_weather"
+    def __init__(self, coordinator: JacksonHoleCoordinator) -> None:
+        super().__init__(coordinator, "weather")
 
     @property
     def condition(self) -> str | None:
-        """Return current weather condition."""
-        try:
-            forecast_data = self.coordinator.data.get("forecast", {})
-            mid_mountain = forecast_data.get("midMountain", {})
-            days = mid_mountain.get("days", [])
-            if days:
-                today = days[0]
-                icon = today.get("icon", "")
-                return WEATHER_CONDITION_MAP.get(icon, "cloudy")
-            return None
-        except (KeyError, IndexError, TypeError):
-            return None
+        # The feed has no current condition; today's forecast icon is closest.
+        days = _days(self.coordinator.data)
+        return map_condition(days[0].get("icon")) if days else None
 
     @property
     def native_temperature(self) -> float | None:
-        """Return current temperature."""
-        try:
-            weather_data = self.coordinator.data.get("weather", {})
-            mid_mountain = weather_data.get("midMountain", {})
-            temp_data = mid_mountain.get("temperature", {})
-            return float(temp_data.get("value"))
-        except (KeyError, ValueError, TypeError):
-            return None
+        return measure(self.coordinator.data, "weather", "midMountain", "temperature")
 
     @property
     def native_wind_speed(self) -> float | None:
-        """Return current wind speed."""
-        try:
-            weather_data = self.coordinator.data.get("weather", {})
-            mid_mountain = weather_data.get("midMountain", {})
-            wind_data = mid_mountain.get("wind", {})
-            value = wind_data.get("value")
-            return float(value) if value is not None else None
-        except (KeyError, ValueError, TypeError):
-            return None
-
-    @property
-    def forecast(self) -> list[Forecast] | None:
-        """Return forecast."""
-        try:
-            forecast_data = self.coordinator.data.get("forecast", {})
-            mid_mountain = forecast_data.get("midMountain", {})
-            days = mid_mountain.get("days", [])
-            forecasts = []
-
-            for day in days:
-                try:
-                    date_str = day.get("date")
-                    if not date_str:
-                        continue
-
-                    # Parse date
-                    forecast_date = datetime.strptime(date_str, "%Y-%m-%d")
-
-                    # Map weather condition
-                    icon = day.get("icon", "")
-                    condition = WEATHER_CONDITION_MAP.get(icon, "cloudy")
-
-                    # Get temperatures
-                    high_temp_data = day.get("highTemperature", {})
-                    low_temp_data = day.get("lowTemperature", {})
-
-                    forecast = Forecast(
-                        datetime=forecast_date.isoformat(),
-                        condition=condition,
-                        native_temperature=float(high_temp_data.get("value", 0)),
-                        native_templow=float(low_temp_data.get("value", 0)),
-                    )
-
-                    # Add wind if available
-                    wind_data = day.get("wind", {})
-                    if wind_data.get("valueMin"):
-                        forecast["native_wind_speed"] = float(wind_data.get("valueMin", 0))
-
-                    forecasts.append(forecast)
-                except (KeyError, ValueError, TypeError) as err:
-                    _LOGGER.debug("Error parsing forecast day: %s", err)
-                    continue
-
-            return forecasts if forecasts else None
-        except (KeyError, TypeError):
-            return None
+        return measure(self.coordinator.data, "weather", "midMountain", "wind")
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return additional attributes."""
-        try:
-            attributes = {}
+        data = self.coordinator.data
+        snow = section(data, "snow")
+        mid = section(snow, "midMountain")
+        attributes: dict[str, Any] = {}
+        if (depth := measure(mid, "totalSnowDepth")) is not None:
+            attributes["snow_depth"] = f"{depth:g} in"
+        if (fresh := measure(mid, "newSnowLast24H")) is not None:
+            attributes["snowfall_24h"] = f"{fresh:g} in"
+        if last_snow := data.get("lastSnowFallDate"):
+            attributes["last_snowfall"] = last_snow
+        if snow.get("inversion") is True:
+            attributes["inversion_alert"] = snow.get("inversionMessage") or ""
+        return attributes
 
-            # Add snow data
-            snow_data = self.coordinator.data.get("snow", {})
-            mid_mountain = snow_data.get("midMountain", {})
-            depth = mid_mountain.get("totalSnowDepth", {})
-            if depth.get("value"):
-                attributes["snow_depth"] = f"{depth.get('value')} {depth.get('unitSymbol', 'in')}"
+    async def async_forecast_daily(self) -> list[Forecast] | None:
+        return build_forecast(self.coordinator.data)
 
-            snowfall_24h = mid_mountain.get("newSnowLast24H", {})
-            if snowfall_24h.get("value"):
-                attributes["snowfall_24h"] = f"{snowfall_24h.get('value')} {snowfall_24h.get('unitSymbol', 'in')}"
-
-            # Add last snowfall date
-            last_snow = self.coordinator.data.get("lastSnowFallDate")
-            if last_snow:
-                attributes["last_snowfall"] = last_snow
-
-            # Add inversion alert if present
-            if snow_data.get("inversion"):
-                attributes["inversion_alert"] = snow_data.get("inversionMessage", "")
-
-            return attributes
-        except (KeyError, TypeError):
-            return {}
-
-    @property
-    def device_info(self):
-        """Return device information."""
-        return {
-            "identifiers": {(DOMAIN, "jackson_hole_resort")},
-            "name": "Jackson Hole Mountain Resort",
-            "manufacturer": MANUFACTURER,
-            "model": MODEL,
-        }
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        super()._handle_coordinator_update()
+        self.coordinator.config_entry.async_create_task(
+            self.hass, self.async_update_listeners(("daily",))
+        )
