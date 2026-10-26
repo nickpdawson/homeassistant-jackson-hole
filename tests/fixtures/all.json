@@ -1,0 +1,1072 @@
+{
+ "respTimestamp": "2026-10-26T19:58:00Z",
+ "lastModified": "2026-04-12T06:14:00.000-06:00",
+ "lastSnowFallDate": "2026-04-12",
+ "snow": {
+  "lastModified": "4/12/26, 6:14 AM",
+  "lastSnowFallDate": "April 12, 2026",
+  "psa": "",
+  "detail": "April 13th, 2026—The radical, rollercoaster ski season of 2025/26 has come to an end here in Jackson Hole. We'd like to ",
+  "inversion": false,
+  "inversionMessage": "INVERSION ALERT! The Upper Mountain is warmer than the base. Head up high to stay warm.",
+  "midMountain": {
+   "name": "Mid-Mountain",
+   "altitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "10,000"
+   },
+   "seasonTotalSnow": {
+    "unit": "INCH",
+    "unitSymbol": "\"",
+    "value": "0"
+   },
+   "newSnowLast48H": {
+    "unit": "INCH",
+    "unitSymbol": "\"",
+    "value": "0"
+   },
+   "newSnowLast24H": {
+    "unit": "INCH",
+    "unitSymbol": "\"",
+    "value": "0"
+   },
+   "newSnowLast7D": {},
+   "totalSnowDepth": {
+    "unit": "INCH",
+    "unitSymbol": "\"",
+    "value": "40"
+   },
+   "newSnowLast72H": {},
+   "newSnowSinceLiftsClosed": {
+    "unit": "INCH",
+    "unitSymbol": "\"",
+    "value": "0"
+   }
+  },
+  "tramSummit": {
+   "name": "Tram Summit",
+   "altitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "seasonTotalSnow": {
+    "unit": "INCH",
+    "unitSymbol": "\"",
+    "value": "0"
+   },
+   "newSnowLast48H": {
+    "unit": "INCH",
+    "unitSymbol": "\"",
+    "value": "0"
+   },
+   "newSnowLast24H": {
+    "unit": "INCH",
+    "unitSymbol": "\"",
+    "value": "0"
+   },
+   "newSnowSince6am": {
+    "unit": "INCH",
+    "unitSymbol": "\"",
+    "value": "0"
+   },
+   "newSnowLast7D": {
+    "unit": "INCH",
+    "unitSymbol": "\"",
+    "value": "0"
+   },
+   "totalSnowDepth": {
+    "unit": "INCH",
+    "unitSymbol": "\"",
+    "value": "74"
+   },
+   "newSnowLast72H": {},
+   "newSnowSinceLiftsClosed": {
+    "unit": "INCH",
+    "unitSymbol": "\"",
+    "value": "0"
+   }
+  },
+  "base": {}
+ },
+ "weather": {
+  "midMountain": {
+   "name": "Mid-Mountain (Current Temp)",
+   "temperature": {
+    "unit": "FAHRENHEIT",
+    "unitSymbol": "°",
+    "value": "42"
+   },
+   "wind": {
+    "unit": "MPH",
+    "unitSymbol": "mph",
+    "value": "7"
+   }
+  },
+  "topofBridger": {
+   "name": "Top of Bridger (Current)",
+   "temperature": {
+    "unit": "FAHRENHEIT",
+    "unitSymbol": "°",
+    "value": "35"
+   },
+   "wind": {
+    "unit": "MPH",
+    "unitSymbol": "mph",
+    "value": "10"
+   }
+  },
+  "tramSummit": {
+   "name": "Tram Summit (Current)",
+   "temperature": {
+    "unit": "FAHRENHEIT",
+    "unitSymbol": "°",
+    "value": "29"
+   },
+   "wind": {
+    "unit": "MPH",
+    "unitSymbol": "mph",
+    "value": "6"
+   }
+  },
+  "base": {
+   "name": "Base (Current)",
+   "temperature": {
+    "unit": "FAHRENHEIT",
+    "unitSymbol": "°",
+    "value": "52"
+   },
+   "wind": {}
+  }
+ },
+ "forecast": {
+  "midMountain": {
+   "days": [
+    {
+     "date": "2026-10-26",
+     "visibility": "",
+     "highTemperature": {
+      "unit": "FAHRENHEIT",
+      "unitSymbol": "°",
+      "value": "45"
+     },
+     "name": "Today",
+     "precipitationChance": {},
+     "lowTemperature": {
+      "unit": "FAHRENHEIT",
+      "unitSymbol": "°",
+      "value": "34"
+     },
+     "day": "Monday",
+     "wind": {
+      "unit": "MPH",
+      "unitSymbol": "mph",
+      "valueMin": "9",
+      "direction": "South"
+     },
+     "icon": "icon-svg_partlycloudy",
+     "description": "Mostly Cloudy, Some Sun"
+    },
+    {
+     "date": "2026-10-27",
+     "visibility": "",
+     "highTemperature": {
+      "unit": "FAHRENHEIT",
+      "unitSymbol": "°",
+      "value": "34"
+     },
+     "name": "Tomorrow",
+     "precipitationChance": {},
+     "lowTemperature": {
+      "unit": "FAHRENHEIT",
+      "unitSymbol": "°",
+      "value": "28"
+     },
+     "day": "Tuesday",
+     "wind": {},
+     "icon": "icon-svg_partlycloudy",
+     "description": "Mostly Cloudy, Some Sun"
+    },
+    {
+     "date": "2026-10-28",
+     "visibility": "",
+     "highTemperature": {
+      "unit": "FAHRENHEIT",
+      "unitSymbol": "°",
+      "value": "34"
+     },
+     "name": "Wednesday",
+     "precipitationChance": {},
+     "lowTemperature": {
+      "unit": "FAHRENHEIT",
+      "unitSymbol": "°",
+      "value": "27"
+     },
+     "day": "Wednesday",
+     "wind": {},
+     "icon": "icon-svg_partlycloudy",
+     "description": "Mostly Sunny, Some Clouds"
+    },
+    {
+     "date": "2026-10-29",
+     "visibility": "",
+     "highTemperature": {
+      "unit": "FAHRENHEIT",
+      "unitSymbol": "°",
+      "value": "39"
+     },
+     "name": "Thursday",
+     "precipitationChance": {},
+     "lowTemperature": {
+      "unit": "FAHRENHEIT",
+      "unitSymbol": "°",
+      "value": "27"
+     },
+     "day": "Thursday",
+     "wind": {},
+     "icon": "icon-svg_partlycloudy",
+     "description": "Mostly Sunny"
+    },
+    {
+     "date": "2026-10-30",
+     "visibility": "",
+     "highTemperature": {
+      "unit": "FAHRENHEIT",
+      "unitSymbol": "°",
+      "value": "37"
+     },
+     "name": "Friday",
+     "precipitationChance": {},
+     "lowTemperature": {
+      "unit": "FAHRENHEIT",
+      "unitSymbol": "°",
+      "value": "32"
+     },
+     "day": "Friday",
+     "wind": {},
+     "icon": "icon-svg_heavysnow",
+     "description": "Snow"
+    },
+    {
+     "date": "2026-10-31",
+     "visibility": "",
+     "highTemperature": {
+      "unit": "FAHRENHEIT",
+      "unitSymbol": "°",
+      "value": "36"
+     },
+     "name": "Saturday",
+     "precipitationChance": {},
+     "lowTemperature": {
+      "unit": "FAHRENHEIT",
+      "unitSymbol": "°",
+      "value": "32"
+     },
+     "day": "Saturday",
+     "wind": {},
+     "icon": "icon-svg_heavysnow",
+     "description": "Snow"
+    }
+   ]
+  },
+  "base": {
+   "days": [
+    {
+     "date": "2026-10-26",
+     "visibility": "",
+     "highTemperature": {
+      "unit": "FAHRENHEIT",
+      "unitSymbol": "°",
+      "value": "54"
+     },
+     "name": "Today",
+     "precipitationChance": {},
+     "lowTemperature": {
+      "unit": "FAHRENHEIT",
+      "unitSymbol": "°",
+      "value": "30"
+     },
+     "day": "Monday",
+     "wind": {
+      "unit": "MPH",
+      "unitSymbol": "mph",
+      "valueMin": "4",
+      "direction": "South"
+     },
+     "icon": "icon-svg_partlycloudy",
+     "description": "Mostly Sunny, Some Clouds"
+    },
+    {
+     "date": "2026-10-27",
+     "visibility": "",
+     "highTemperature": {
+      "unit": "FAHRENHEIT",
+      "unitSymbol": "°",
+      "value": "43"
+     },
+     "name": "Tomorrow",
+     "precipitationChance": {},
+     "lowTemperature": {
+      "unit": "FAHRENHEIT",
+      "unitSymbol": "°",
+      "value": "23"
+     },
+     "day": "Tuesday",
+     "wind": {},
+     "icon": "icon-svg_partlycloudy",
+     "description": "Mostly Cloudy, Some Sun"
+    },
+    {
+     "date": "2026-10-28",
+     "visibility": "",
+     "highTemperature": {
+      "unit": "FAHRENHEIT",
+      "unitSymbol": "°",
+      "value": "43"
+     },
+     "name": "Wednesday",
+     "precipitationChance": {},
+     "lowTemperature": {
+      "unit": "FAHRENHEIT",
+      "unitSymbol": "°",
+      "value": "21"
+     },
+     "day": "Wednesday",
+     "wind": {},
+     "icon": "icon-svg_partlycloudy",
+     "description": "Mostly Cloudy, Some Sun"
+    },
+    {
+     "date": "2026-10-29",
+     "visibility": "",
+     "highTemperature": {
+      "unit": "FAHRENHEIT",
+      "unitSymbol": "°",
+      "value": "48"
+     },
+     "name": "Thursday",
+     "precipitationChance": {},
+     "lowTemperature": {
+      "unit": "FAHRENHEIT",
+      "unitSymbol": "°",
+      "value": "19"
+     },
+     "day": "Thursday",
+     "wind": {},
+     "icon": "icon-svg_partlycloudy",
+     "description": "Mostly Sunny, Some Clouds"
+    },
+    {
+     "date": "2026-10-30",
+     "visibility": "",
+     "highTemperature": {
+      "unit": "FAHRENHEIT",
+      "unitSymbol": "°",
+      "value": "45"
+     },
+     "name": "Friday",
+     "precipitationChance": {},
+     "lowTemperature": {
+      "unit": "FAHRENHEIT",
+      "unitSymbol": "°",
+      "value": "27"
+     },
+     "day": "Friday",
+     "wind": {},
+     "icon": "icon-svg_heavysnow",
+     "description": "Snow"
+    },
+    {
+     "date": "2026-10-31",
+     "visibility": "",
+     "highTemperature": {
+      "unit": "FAHRENHEIT",
+      "unitSymbol": "°",
+      "value": "45"
+     },
+     "name": "Saturday",
+     "precipitationChance": {},
+     "lowTemperature": {
+      "unit": "FAHRENHEIT",
+      "unitSymbol": "°",
+      "value": "28"
+     },
+     "day": "Saturday",
+     "wind": {},
+     "icon": "icon-svg_heavysnow",
+     "description": "Snow"
+    }
+   ]
+  },
+  "summitTopofTram": {}
+ },
+ "liftStatus": {
+  "totalLifts": 13,
+  "openLifts": 0,
+  "expectedOpenLifts": 0
+ },
+ "trailStatus": {
+  "totalTrails": 130,
+  "openTrails": 0,
+  "groomedTrails": 30,
+  "totalParks": 4,
+  "openParks": 0
+ },
+ "lifts": {
+  "tetonQuad": {
+   "id": "6061",
+   "openingStatus": "OUT_OF_PERIOD",
+   "liftType": "DETACHABLE_CHAIRLIFT",
+   "name": "Teton Quad",
+   "departureAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "length": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "type": "SKI_LIFT",
+   "message": "for the season",
+   "arrivalAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "speed": {
+    "unit": "FTS",
+    "unitSymbol": "ft/sec",
+    "value": "0"
+   }
+  },
+  "eaglesRestQuad": {
+   "id": "6050",
+   "openingStatus": "OUT_OF_PERIOD",
+   "liftType": "CHAIRLIFT",
+   "name": "Eagle's Rest Quad",
+   "departureAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "length": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "type": "SKI_LIFT",
+   "message": "for the season",
+   "arrivalAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "speed": {
+    "unit": "FTS",
+    "unitSymbol": "ft/sec",
+    "value": "0"
+   }
+  },
+  "mooseCreekQuad": {
+   "id": "6053",
+   "openingStatus": "OUT_OF_PERIOD",
+   "liftType": "CHAIRLIFT",
+   "name": "Moose Creek Quad",
+   "departureAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "length": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "type": "SKI_LIFT",
+   "message": "for the season",
+   "arrivalAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "speed": {
+    "unit": "FTS",
+    "unitSymbol": "ft/sec",
+    "value": "0"
+   }
+  },
+  "sweetwaterGondola": {
+   "id": "6054",
+   "openingStatus": "CLOSED",
+   "liftType": "GONDOLA",
+   "name": "Sweetwater Gondola",
+   "departureAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "length": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "type": "SKI_LIFT",
+   "message": "For the Season",
+   "arrivalAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "speed": {
+    "unit": "FTS",
+    "unitSymbol": "ft/sec",
+    "value": "0"
+   }
+  },
+  "apresVousQuad": {
+   "id": "6051",
+   "openingStatus": "OUT_OF_PERIOD",
+   "liftType": "DETACHABLE_CHAIRLIFT",
+   "name": "Apres Vous Quad",
+   "departureAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "length": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "type": "SKI_LIFT",
+   "message": "for the season",
+   "arrivalAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "speed": {
+    "unit": "FTS",
+    "unitSymbol": "ft/sec",
+    "value": "0"
+   }
+  },
+  "teewinotQuad": {
+   "id": "6055",
+   "openingStatus": "CLOSED",
+   "liftType": "DETACHABLE_CHAIRLIFT",
+   "name": "Teewinot Quad",
+   "departureAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "length": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "type": "SKI_LIFT",
+   "message": "For the Season",
+   "arrivalAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "speed": {
+    "unit": "FTS",
+    "unitSymbol": "ft/sec",
+    "value": "0"
+   }
+  },
+  "unionPassQuad": {
+   "id": "6056",
+   "openingStatus": "OUT_OF_PERIOD",
+   "liftType": "CHAIRLIFT",
+   "name": "Union Pass Quad",
+   "departureAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "length": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "type": "SKI_LIFT",
+   "message": "for the season",
+   "arrivalAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "speed": {
+    "unit": "FTS",
+    "unitSymbol": "ft/sec",
+    "value": "0"
+   }
+  },
+  "marmotDouble": {
+   "id": "6059",
+   "openingStatus": "OUT_OF_PERIOD",
+   "liftType": "CHAIRLIFT",
+   "name": "Marmot Double",
+   "departureAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "length": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "type": "SKI_LIFT",
+   "message": "for the season",
+   "arrivalAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "speed": {
+    "unit": "FTS",
+    "unitSymbol": "ft/sec",
+    "value": "0"
+   }
+  },
+  "casperQuad": {
+   "id": "6052",
+   "openingStatus": "OUT_OF_PERIOD",
+   "liftType": "DETACHABLE_CHAIRLIFT",
+   "name": "Casper Quad",
+   "departureAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "length": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "type": "SKI_LIFT",
+   "message": "for the season",
+   "arrivalAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "speed": {
+    "unit": "FTS",
+    "unitSymbol": "ft/sec",
+    "value": "0"
+   }
+  },
+  "subletteQuad": {
+   "id": "6060",
+   "openingStatus": "OUT_OF_PERIOD",
+   "liftType": "CHAIRLIFT",
+   "name": "Sublette Quad",
+   "departureAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "length": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "type": "SKI_LIFT",
+   "message": "for the season",
+   "arrivalAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "speed": {
+    "unit": "FTS",
+    "unitSymbol": "ft/sec",
+    "value": "0"
+   }
+  },
+  "aerialTram": {
+   "id": "6057",
+   "openingStatus": "CLOSED",
+   "liftType": "TRAM",
+   "name": "Aerial Tram",
+   "departureAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "6,000"
+   },
+   "length": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "type": "SKI_LIFT",
+   "message": "For the Season",
+   "arrivalAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "speed": {
+    "unit": "FTS",
+    "unitSymbol": "ft/sec",
+    "value": "0"
+   }
+  },
+  "bridgerGondola": {
+   "id": "6058",
+   "openingStatus": "CLOSED",
+   "liftType": "GONDOLA",
+   "name": "Bridger Gondola",
+   "departureAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "length": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "type": "SKI_LIFT",
+   "message": "For the Season",
+   "arrivalAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "speed": {
+    "unit": "FTS",
+    "unitSymbol": "ft/sec",
+    "value": "0"
+   }
+  },
+  "thunderQuad": {
+   "id": "6062",
+   "openingStatus": "OUT_OF_PERIOD",
+   "liftType": "CHAIRLIFT",
+   "name": "Thunder Quad",
+   "departureAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "length": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "type": "SKI_LIFT",
+   "message": "for the season",
+   "arrivalAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "speed": {
+    "unit": "FTS",
+    "unitSymbol": "ft/sec",
+    "value": "0"
+   }
+  }
+ },
+ "trails": {
+  "nezPerce": {
+   "id": "6073",
+   "openingStatus": "CLOSED",
+   "groomingStatus": "",
+   "trailLevel": "DOUBLE_BLUE_SQUARE",
+   "name": "Nez Perce",
+   "departureAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "length": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "trailType": "DOWNHILL_SKIING",
+   "type": "TRAIL",
+   "message": "",
+   "arrivalAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   }
+  },
+  "washakieGlade": {
+   "id": "6206",
+   "openingStatus": "CLOSED",
+   "groomingStatus": "",
+   "trailLevel": "DOUBLE_BLACK_DIAMOND",
+   "name": "Washakie Glade",
+   "departureAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "length": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "trailType": "DOWNHILL_SKIING",
+   "type": "TRAIL",
+   "message": "",
+   "arrivalAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   }
+  },
+  "easyDoesIt": {
+   "id": "6094",
+   "openingStatus": "CLOSED",
+   "groomingStatus": "Groomed AM",
+   "trailLevel": "BLUE_SQUARE",
+   "name": "Easy Does It",
+   "departureAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "length": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "trailType": "DOWNHILL_SKIING",
+   "type": "TRAIL",
+   "message": "",
+   "arrivalAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   }
+  },
+  "moranWoods": {
+   "id": "6142",
+   "openingStatus": "CLOSED",
+   "groomingStatus": "",
+   "trailLevel": "BLACK_DIAMOND",
+   "name": "Moran Woods",
+   "departureAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "length": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "trailType": "DOWNHILL_SKIING",
+   "type": "TRAIL",
+   "message": "",
+   "arrivalAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   }
+  },
+  "sundanceUpper": {
+   "id": "6112",
+   "openingStatus": "CLOSED",
+   "groomingStatus": "Groomed PM",
+   "trailLevel": "DOUBLE_BLUE_SQUARE",
+   "name": "Sundance (Upper)",
+   "departureAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "length": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "trailType": "DOWNHILL_SKIING",
+   "type": "TRAIL",
+   "message": "",
+   "arrivalAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   }
+  },
+  "tramLine": {
+   "id": "6120",
+   "openingStatus": "CLOSED",
+   "groomingStatus": "",
+   "trailLevel": "DOUBLE_BLUE_SQUARE",
+   "name": "Tram Line",
+   "departureAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "length": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "trailType": "DOWNHILL_SKIING",
+   "type": "TRAIL",
+   "message": "",
+   "arrivalAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   }
+  },
+  "southPassTraverse": {
+   "id": "6099",
+   "openingStatus": "CLOSED",
+   "groomingStatus": "Groomed AM",
+   "trailLevel": "BLUE_SQUARE",
+   "name": "South Pass Traverse",
+   "departureAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "length": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "trailType": "DOWNHILL_SKIING",
+   "type": "TRAIL",
+   "message": "",
+   "arrivalAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   }
+  },
+  "southHoback": {
+   "id": "6167",
+   "openingStatus": "CLOSED",
+   "groomingStatus": "",
+   "trailLevel": "BLACK_DIAMOND",
+   "name": "South Hoback",
+   "departureAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "length": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "trailType": "DOWNHILL_SKIING",
+   "type": "TRAIL",
+   "message": "",
+   "arrivalAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   }
+  },
+  "eaglesRest": {
+   "id": "6071",
+   "openingStatus": "CLOSED",
+   "groomingStatus": "",
+   "trailLevel": "GREEN_CIRCLE",
+   "name": "Eagle's Rest",
+   "departureAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "length": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "trailType": "DOWNHILL_SKIING",
+   "type": "TRAIL",
+   "message": "",
+   "arrivalAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   }
+  },
+  "broncoTerrainPark": {
+   "id": "6063",
+   "openingStatus": "CLOSED",
+   "groomingStatus": "",
+   "trailLevel": "TERRAIN_PARKS",
+   "name": "Bronco Terrain Park",
+   "departureAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "length": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   },
+   "trailType": "DOWNHILL_SKIING",
+   "type": "TRAIL",
+   "message": "",
+   "arrivalAltitude": {
+    "unit": "FOOT",
+    "unitSymbol": "ft",
+    "value": "0"
+   }
+  }
+ },
+ "summerTrailStatus": {
+  "totalHikingTrails": 0,
+  "openHikingTrails": 0,
+  "totalBikeTrails": 0,
+  "openBikeTrails": 0
+ },
+ "summerHikingTrails": {},
+ "summerBikeTrails": {},
+ "other": {},
+ "webcams": [
+  {
+   "isPanoCam": false,
+   "thumbUrl": "https://cams.jacksonhole.com/webcam/thumbnails/codybowl.jpg",
+   "url": "https://cams.jacksonhole.com/webcam/codybowl.jpg",
+   "liveStreamUrl": "",
+   "youtubeId": "",
+   "altText": "Cody Bowl",
+   "caption": "Cody Bowl"
+  },
+  {
+   "isPanoCam": true,
+   "thumbUrl": "https://backend.roundshot.com/cams/81592a0cc1631500d6afefe900c304f0/medium",
+   "url": "https://backend.roundshot.com/cams/12a4b2c24cd515e0a115d4a0f59ef7f8/default",
+   "liveStreamUrl": "",
+   "youtubeId": "",
+   "altText": "Summit - Pano Cam",
+   "caption": "Summit - Pano Cam"
+  },
+  {
+   "isPanoCam": true,
+   "thumbUrl": "https://backend.roundshot.com/cams/6f7dc91857e22fe329e8bdeef5ee5750/medium",
+   "url": "https://backend.roundshot.com/cams/6f7dc91857e22fe329e8bdeef5ee5750/default",
+   "liveStreamUrl": "",
+   "youtubeId": "",
+   "altText": "Rendezvous Lodge",
+   "caption": "Rendezvous Lodge"
+  }
+ ]
+}
