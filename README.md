@@ -122,3 +122,7 @@ settings and the last feed response.
   entity shows snow as "40 in".
 - Changes in the options dialog are saved to the entry's options. Before
   2.0.0 the dialog failed to open on current Home Assistant.
+
+## License
+
+CC0 1.0 Universal. See [LICENSE](LICENSE).
