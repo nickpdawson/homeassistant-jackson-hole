@@ -73,6 +73,10 @@ Get the forecast with the `weather.get_forecasts` action and `type: daily`.
 Webcam images are cached for 60 seconds. Small cards get the feed's
 thumbnail instead of the full image.
 
+New lifts, trails and webcams get entities on the next fetch that lists
+them, with no restart. Items missing from the feed are not deleted; they
+stay unavailable until the season changes back.
+
 ## Troubleshooting
 
 Turn on debug logging in `configuration.yaml`:
@@ -92,8 +96,10 @@ settings and the last feed response.
 - **Off season**: the feed keeps publishing with everything closed, so
   lift and trail sensors read off and counts read 0. Values the resort
   leaves blank show as unknown.
-- **A lift, trail or webcam shows unavailable**: the resort removed or
-  renamed it in the feed. Delete the entity if it does not come back.
+- **A lift, trail or webcam shows unavailable**: it is missing from the
+  feed. The resort drops some items between seasons, so the entity stays
+  unavailable until the season changes back. If the resort renamed or
+  removed it for good, delete the entity.
 - **Too many entities**: turn off trail entities in the options.
 
 ## Breaking changes in 2.0.0
