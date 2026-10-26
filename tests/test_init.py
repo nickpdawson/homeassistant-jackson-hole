@@ -1,8 +1,10 @@
 """Setup, unload, reload, entity, migration and diagnostics tests."""
 from __future__ import annotations
 
+import copy
+
 from homeassistant.config_entries import ConfigEntryState
-from homeassistant.const import STATE_OFF, STATE_ON, STATE_UNKNOWN
+from homeassistant.const import STATE_OFF, STATE_ON, STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -137,6 +139,82 @@ async def test_lift_gone_from_feed(
     await config_entry.runtime_data.async_refresh()
     await hass.async_block_till_done()
     assert hass.states.get(f"binary_sensor.{P}_lift_aerial_tram").state == "unavailable"
+
+
+async def _refresh(hass: HomeAssistant, aioclient_mock, entry, feed) -> None:
+    aioclient_mock.clear_requests()
+    aioclient_mock.get(DEFAULT_API_URL, json=feed)
+    await entry.runtime_data.async_refresh()
+    await hass.async_block_till_done()
+
+
+async def test_new_items_added_on_refresh(
+    hass: HomeAssistant, aioclient_mock, feed, config_entry
+) -> None:
+    """Lifts, trails and webcams that show up later get entities without a reload."""
+    full = copy.deepcopy(feed)
+    full["summerBikeTrails"] = {
+        "lowerLeisure": {"name": "Lower Leisure", "openingStatus": "OPEN", "trailLevel": "GREEN"}
+    }
+    del feed["lifts"]["aerialTram"]
+    del feed["trails"]["easyDoesIt"]
+    cody = feed["webcams"].pop(0)
+    assert cody["caption"] == "Cody Bowl"
+    aioclient_mock.get(DEFAULT_API_URL, json=feed)
+    await _setup(hass, config_entry)
+
+    ids = [
+        f"binary_sensor.{P}_lift_aerial_tram",
+        f"binary_sensor.{P}_trail_easy_does_it",
+        f"binary_sensor.{P}_trail_lower_leisure",
+        f"camera.{P}_webcam_cody_bowl",
+    ]
+    for entity_id in ids:
+        assert hass.states.get(entity_id) is None
+
+    await _refresh(hass, aioclient_mock, config_entry, full)
+    for entity_id in ids:
+        assert hass.states.get(entity_id) is not None, entity_id
+    assert hass.states.get(ids[2]).state == STATE_ON
+    registry = er.async_get(hass)
+    eid = config_entry.entry_id
+    assert registry.async_get(ids[0]).unique_id == f"{eid}_lift_aerialTram"
+    assert registry.async_get(ids[3]).unique_id == f"{eid}_webcam_cody_bowl"
+
+    # A second refresh with the same items adds nothing new.
+    count = len(er.async_entries_for_config_entry(registry, eid))
+    await _refresh(hass, aioclient_mock, config_entry, full)
+    assert len(er.async_entries_for_config_entry(registry, eid)) == count
+
+    # Gone again: the entities stay and go unavailable.
+    await _refresh(hass, aioclient_mock, config_entry, feed)
+    for entity_id in ids[:2] + ids[3:]:
+        assert hass.states.get(entity_id).state == STATE_UNAVAILABLE, entity_id
+        assert registry.async_get(entity_id) is not None
+
+
+async def test_new_items_respect_options(
+    hass: HomeAssistant, aioclient_mock, feed, config_entry
+) -> None:
+    full = copy.deepcopy(feed)
+    del feed["lifts"]["aerialTram"]
+    del feed["trails"]["easyDoesIt"]
+    feed["webcams"].pop(0)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        version=1,
+        data={
+            **config_entry.data,
+            "create_lift_entities": False,
+            "create_webcam_entities": False,
+        },
+    )
+    aioclient_mock.get(DEFAULT_API_URL, json=feed)
+    await _setup(hass, entry)
+    await _refresh(hass, aioclient_mock, entry, full)
+    assert hass.states.get(f"binary_sensor.{P}_lift_aerial_tram") is None
+    assert hass.states.get(f"camera.{P}_webcam_cody_bowl") is None
+    assert hass.states.get(f"binary_sensor.{P}_trail_easy_does_it") is not None
 
 
 async def test_unique_id_migration(hass: HomeAssistant, mock_api, config_entry) -> None:

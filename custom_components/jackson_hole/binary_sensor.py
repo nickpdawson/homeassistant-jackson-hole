@@ -7,7 +7,7 @@ from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .api import is_open, section, to_number
@@ -37,27 +37,37 @@ async def async_setup_entry(
     """Set up lift and trail binary sensors."""
     coordinator = entry.runtime_data
     config = entry_config(entry)
-    data = coordinator.data
-    entities: list[BinarySensorEntity] = []
-
-    if config[CONF_CREATE_LIFT_ENTITIES]:
-        entities.extend(
-            JacksonHoleLiftBinarySensor(coordinator, slug, lift)
-            for slug, lift in section(data, "lifts").items()
-            if isinstance(lift, dict)
-        )
+    create_lifts = config[CONF_CREATE_LIFT_ENTITIES]
     categories = []
     if config[CONF_CREATE_TRAIL_ENTITIES]:
         categories.append("winter")
     if config[CONF_CREATE_SUMMER_ENTITIES]:
         categories += ["hiking", "bike"]
-    for category in categories:
-        entities.extend(
-            JacksonHoleTrailBinarySensor(coordinator, slug, trail, category)
-            for slug, trail in section(data, TRAIL_SOURCES[category]).items()
-            if isinstance(trail, dict)
-        )
-    async_add_entities(entities)
+    added: set[str] = set()
+
+    # The feed switches between summer and winter content, so lifts and
+    # trails can appear long after setup.
+    @callback
+    def _add_new_items() -> None:
+        data = coordinator.data
+        entities: list[BinarySensorEntity] = []
+        if create_lifts:
+            for slug, lift in section(data, "lifts").items():
+                if isinstance(lift, dict) and (key := f"lift_{slug}") not in added:
+                    added.add(key)
+                    entities.append(JacksonHoleLiftBinarySensor(coordinator, slug, lift))
+        for category in categories:
+            for slug, trail in section(data, TRAIL_SOURCES[category]).items():
+                if isinstance(trail, dict) and (key := f"trail_{category}_{slug}") not in added:
+                    added.add(key)
+                    entities.append(
+                        JacksonHoleTrailBinarySensor(coordinator, slug, trail, category)
+                    )
+        if entities:
+            async_add_entities(entities)
+
+    _add_new_items()
+    entry.async_on_unload(coordinator.async_add_listener(_add_new_items))
 
 
 def _with_unit(node: Any, default_unit: str) -> str | None:

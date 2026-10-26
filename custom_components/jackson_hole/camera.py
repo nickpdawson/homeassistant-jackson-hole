@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 import aiohttp
 
 from homeassistant.components.camera import Camera
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .api import ApiError, read_limited, webcam_keys
@@ -38,11 +38,22 @@ async def async_setup_entry(
     if not entry_config(entry)[CONF_CREATE_WEBCAM_ENTITIES]:
         return
     coordinator = entry.runtime_data
-    webcams = coordinator.data.get("webcams")
-    async_add_entities(
-        JacksonHoleWebcam(coordinator, key, cam)
-        for key, cam in zip(webcam_keys(webcams), webcams or [])
-    )
+    added: set[str] = set()
+
+    # Webcams come and go with the season, like lifts and trails.
+    @callback
+    def _add_new_webcams() -> None:
+        webcams = coordinator.data.get("webcams")
+        entities = []
+        for key, cam in zip(webcam_keys(webcams), webcams or []):
+            if key not in added:
+                added.add(key)
+                entities.append(JacksonHoleWebcam(coordinator, key, cam))
+        if entities:
+            async_add_entities(entities)
+
+    _add_new_webcams()
+    entry.async_on_unload(coordinator.async_add_listener(_add_new_webcams))
 
 
 def _https_url(value: Any) -> str | None:
