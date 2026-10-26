@@ -1,108 +1,124 @@
-"""Camera platform for Jackson Hole Mountain Resort."""
+"""Webcam still images for Jackson Hole Mountain Resort."""
 from __future__ import annotations
+
+import asyncio
 import logging
+import time
+from typing import Any
+from urllib.parse import urlparse
+
 import aiohttp
-import async_timeout
 
 from homeassistant.components.camera import Camera
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .const import DOMAIN, MANUFACTURER, MODEL, ATTRIBUTION, API_TIMEOUT
-from .coordinator import JacksonHoleDataUpdateCoordinator
+from .api import ApiError, read_limited, webcam_keys
+from .const import (
+    CONF_CREATE_WEBCAM_ENTITIES,
+    FETCH_TIMEOUT,
+    IMAGE_CACHE_SECONDS,
+    MAX_IMAGE_BYTES,
+)
+from .coordinator import JacksonHoleConfigEntry, JacksonHoleCoordinator, entry_config
+from .entity import JacksonHoleEntity
 
 _LOGGER = logging.getLogger(__name__)
 
+# Below this requested width, the feed's thumbnail is good enough.
+THUMBNAIL_MAX_WIDTH = 640
+
 
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback,
+    hass: HomeAssistant,
+    entry: JacksonHoleConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up Jackson Hole webcam entities."""
-    coordinator: JacksonHoleDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
-    if not entry.data.get("create_webcam_entities", True):
+    """Set up one camera per webcam in the feed."""
+    if not entry_config(entry)[CONF_CREATE_WEBCAM_ENTITIES]:
         return
+    coordinator = entry.runtime_data
+    webcams = coordinator.data.get("webcams")
+    async_add_entities(
+        JacksonHoleWebcam(coordinator, key, cam)
+        for key, cam in zip(webcam_keys(webcams), webcams or [])
+    )
 
-    entities = []
-    webcams = coordinator.data.get("webcams", [])
-    for index, webcam_data in enumerate(webcams):
-        entities.append(JacksonHoleWebcam(coordinator, index, webcam_data))
 
-    async_add_entities(entities)
+def _https_url(value: Any) -> str | None:
+    """Only fetch https URLs; the feed decides what we download."""
+    if isinstance(value, str) and urlparse(value).scheme == "https":
+        return value
+    return None
 
 
-class JacksonHoleWebcam(CoordinatorEntity, Camera):
-    """Webcam entity for Jackson Hole Mountain Resort."""
+class JacksonHoleWebcam(JacksonHoleEntity, Camera):
+    """Still image from one resort webcam."""
 
-    _attr_attribution = ATTRIBUTION
-    _attr_has_entity_name = True
+    _attr_translation_key = "webcam"
+    _attr_frame_interval = IMAGE_CACHE_SECONDS
 
     def __init__(
-        self, coordinator: JacksonHoleDataUpdateCoordinator, index: int, webcam_data: dict,
+        self, coordinator: JacksonHoleCoordinator, key: str, webcam: dict[str, Any]
     ) -> None:
-        """Initialize the camera."""
-        super().__init__(coordinator)
-        self._index = index
-        self._attr_name = f"Webcam {webcam_data.get('caption', f'Camera {index + 1}')}"
-        self._attr_unique_id = f"jackson_hole_webcam_{index}"
+        JacksonHoleEntity.__init__(self, coordinator, f"webcam_{key}")
         Camera.__init__(self)
+        self._key = key
+        self._attr_translation_placeholders = {
+            "name": webcam.get("caption") or webcam.get("altText") or key
+        }
+        self._cache: dict[str, tuple[float, bytes]] = {}
 
     @property
-    def extra_state_attributes(self):
-        """Return additional attributes."""
-        try:
-            webcams = self.coordinator.data.get("webcams", [])
-            if self._index < len(webcams):
-                webcam = webcams[self._index]
-                return {
-                    "caption": webcam.get("caption", ""),
-                    "alt_text": webcam.get("altText", ""),
-                    "is_pano_cam": webcam.get("isPanoCam", False),
-                }
+    def _webcam(self) -> dict[str, Any] | None:
+        webcams = self.coordinator.data.get("webcams")
+        for key, cam in zip(webcam_keys(webcams), webcams or []):
+            if key == self._key:
+                return cam
+        return None
+
+    @property
+    def available(self) -> bool:
+        return super().available and self._webcam is not None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        if (cam := self._webcam) is None:
             return {}
-        except (KeyError, IndexError, TypeError):
-            return {}
+        return {
+            "caption": cam.get("caption") or "",
+            "alt_text": cam.get("altText") or "",
+            "is_pano_cam": bool(cam.get("isPanoCam")),
+        }
 
     async def async_camera_image(
         self, width: int | None = None, height: int | None = None
     ) -> bytes | None:
-        """Return webcam image."""
+        if (cam := self._webcam) is None:
+            return None
+        url = _https_url(cam.get("url"))
+        if width is not None and width <= THUMBNAIL_MAX_WIDTH:
+            url = _https_url(cam.get("thumbUrl")) or url
+        if url is None:
+            return None
+
+        cached = self._cache.get(url)
+        if cached and time.monotonic() - cached[0] < IMAGE_CACHE_SECONDS:
+            return cached[1]
+
         try:
-            webcams = self.coordinator.data.get("webcams", [])
-            if self._index >= len(webcams):
-                return None
+            async with asyncio.timeout(FETCH_TIMEOUT):
+                async with self.coordinator.session.get(url) as response:
+                    if response.status != 200:
+                        _LOGGER.debug("Webcam %s returned HTTP %s", url, response.status)
+                        return cached[1] if cached else None
+                    if not response.content_type.startswith("image/"):
+                        _LOGGER.debug("Webcam %s sent %s, not an image", url, response.content_type)
+                        return cached[1] if cached else None
+                    image = await read_limited(response, MAX_IMAGE_BYTES)
+        except (TimeoutError, aiohttp.ClientError, ApiError) as err:
+            _LOGGER.debug("Could not fetch webcam %s: %s", url, err)
+            return cached[1] if cached else None
 
-            webcam = webcams[self._index]
-            url = webcam.get("url")
-            if not url:
-                return None
-
-            async with async_timeout.timeout(API_TIMEOUT):
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(url) as response:
-                        if response.status == 200:
-                            return await response.read()
-                        _LOGGER.error(
-                            "Error fetching webcam image: HTTP %s", response.status
-                        )
-                        return None
-        except aiohttp.ClientError as err:
-            _LOGGER.error("Error fetching webcam image: %s", err)
-            return None
-        except asyncio.TimeoutError:
-            _LOGGER.error("Timeout fetching webcam image")
-            return None
-        except Exception as err:
-            _LOGGER.error("Unexpected error fetching webcam image: %s", err)
-            return None
-
-    @property
-    def device_info(self):
-        """Return device information."""
-        return {
-            "identifiers": {(DOMAIN, "jackson_hole_resort")},
-            "name": "Jackson Hole Mountain Resort",
-            "manufacturer": MANUFACTURER,
-            "model": MODEL,
-        }
+        self._cache[url] = (time.monotonic(), image)
+        return image
