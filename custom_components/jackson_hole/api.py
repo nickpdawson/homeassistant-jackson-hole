@@ -14,6 +14,8 @@ from typing import Any
 
 import aiohttp
 
+from homeassistant.util import slugify
+
 from .const import FETCH_TIMEOUT, MAX_RESPONSE_BYTES
 
 
@@ -123,3 +125,23 @@ async def fetch_data(session: aiohttp.ClientSession, url: str) -> dict[str, Any]
     if not isinstance(data, dict) or "respTimestamp" not in data:
         raise ApiError("Response is not the resort feed (no respTimestamp)")
     return data
+
+
+def webcam_keys(webcams: Any) -> list[str]:
+    """Return a stable key per webcam, in feed order.
+
+    Keys come from the caption so a camera keeps its entity when the
+    resort reorders the list. Duplicate captions get a number appended.
+    """
+    keys: list[str] = []
+    if not isinstance(webcams, list):
+        return keys
+    for index, cam in enumerate(webcams):
+        cam = cam if isinstance(cam, dict) else {}
+        label = str(cam.get("caption") or cam.get("altText") or "")
+        base = slugify(label) or f"camera_{index + 1}"
+        key, n = base, 2
+        while key in keys:
+            key, n = f"{base}_{n}", n + 1
+        keys.append(key)
+    return keys

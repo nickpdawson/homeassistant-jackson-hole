@@ -1,55 +1,59 @@
-"""DataUpdateCoordinator for Jackson Hole."""
+"""Data update coordinator for Jackson Hole Mountain Resort."""
 from __future__ import annotations
+
 from datetime import timedelta
 import logging
 from typing import Any
-import aiohttp
-import async_timeout
+
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.update_coordinator import (
-    DataUpdateCoordinator,
-    UpdateFailed,
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+
+from .api import ApiError, fetch_data
+from .const import (
+    CONF_API_URL,
+    CONF_UPDATE_INTERVAL,
+    DEFAULTS,
+    DOMAIN,
+    MAX_UPDATE_INTERVAL,
+    MIN_UPDATE_INTERVAL,
 )
 
-from .const import CONF_API_URL, DEFAULT_API_URL, API_TIMEOUT
+_LOGGER = logging.getLogger(__package__)
 
-_LOGGER = logging.getLogger(__name__)
+type JacksonHoleConfigEntry = ConfigEntry[JacksonHoleCoordinator]
 
 
-class JacksonHoleDataUpdateCoordinator(DataUpdateCoordinator):
-    """Class to manage fetching Jackson Hole data."""
+def entry_config(entry: ConfigEntry) -> dict[str, Any]:
+    """Return defaults, then setup data, then options saved later."""
+    return {**DEFAULTS, **entry.data, **entry.options}
 
-    def __init__(
-        self, hass: HomeAssistant, config: dict[str, Any], update_interval: timedelta,
-    ) -> None:
-        """Initialize."""
-        self.api_url = config.get(CONF_API_URL, DEFAULT_API_URL)
-        super().__init__(
-            hass, _LOGGER, name="Jackson Hole Mountain Resort", update_interval=update_interval,
+
+class JacksonHoleCoordinator(DataUpdateCoordinator[dict[str, Any]]):
+    """Polls all.json."""
+
+    config_entry: JacksonHoleConfigEntry
+
+    def __init__(self, hass: HomeAssistant, entry: JacksonHoleConfigEntry) -> None:
+        config = entry_config(entry)
+        minutes = max(
+            MIN_UPDATE_INTERVAL, min(MAX_UPDATE_INTERVAL, int(config[CONF_UPDATE_INTERVAL]))
         )
+        super().__init__(
+            hass,
+            _LOGGER,
+            config_entry=entry,
+            name=DOMAIN,
+            update_interval=timedelta(minutes=minutes),
+        )
+        self.api_url: str = config[CONF_API_URL]
+        self.session = async_get_clientsession(hass)
 
     async def _async_update_data(self) -> dict[str, Any]:
-        """Fetch data from API."""
         try:
-            async with async_timeout.timeout(API_TIMEOUT):
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(self.api_url) as response:
-                        if response.status != 200:
-                            raise UpdateFailed(
-                                f"Error fetching data: HTTP {response.status}"
-                            )
-                        data = await response.json()
-                        # Validate response structure
-                        if "respTimestamp" not in data:
-                            raise UpdateFailed("Invalid API response structure")
-                        _LOGGER.debug(
-                            "Successfully fetched data. Timestamp: %s",
-                            data.get("respTimestamp"),
-                        )
-                        return data
-        except aiohttp.ClientError as err:
-            raise UpdateFailed(f"Error communicating with API: {err}") from err
-        except asyncio.TimeoutError as err:
-            raise UpdateFailed("Timeout communicating with API") from err
-        except Exception as err:
-            raise UpdateFailed(f"Unexpected error: {err}") from err
+            data = await fetch_data(self.session, self.api_url)
+        except ApiError as err:
+            raise UpdateFailed(str(err)) from err
+        _LOGGER.debug("Fetched feed, respTimestamp %s", data.get("respTimestamp"))
+        return data
