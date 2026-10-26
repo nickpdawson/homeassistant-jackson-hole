@@ -1,13 +1,14 @@
 {
-    "domain": "jackson_hole",
-    "name": "Jackson Hole Mountain Resort",
-    "codeowners": ["@yourgithubusername"],
-    "config_flow": true,
-    "documentation": "https://github.com/yourusername/hass-jackson-hole",
-    "issue_tracker": "https://github.com/yourusername/hass-jackson-hole/issues",
-    "requirements": [],
-    "dependencies": [],
-    "version": "1.0.0",
-    "iot_class": "cloud_polling",
-    "min_homeassistant": "2024.8.0"
+  "domain": "jackson_hole",
+  "name": "Jackson Hole Mountain Resort",
+  "codeowners": ["@nickpdawson"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/nickpdawson/homeassistant-jackson-hole",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/nickpdawson/homeassistant-jackson-hole/issues",
+  "requirements": [],
+  "single_config_entry": true,
+  "version": "2.0.0"
 }

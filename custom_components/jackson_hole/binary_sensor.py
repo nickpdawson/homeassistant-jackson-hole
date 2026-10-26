@@ -1,231 +1,183 @@
-"""Binary sensor platform for Jackson Hole Mountain Resort."""
+"""Lift and trail binary sensors for Jackson Hole Mountain Resort."""
 from __future__ import annotations
-import logging
+
 from typing import Any
 
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
+from .api import is_open, section, to_number
 from .const import (
-    DOMAIN,
-    MANUFACTURER,
-    MODEL,
-    ATTRIBUTION,
     CONF_CREATE_LIFT_ENTITIES,
-    CONF_CREATE_TRAIL_ENTITIES,
     CONF_CREATE_SUMMER_ENTITIES,
-    LIFT_TYPE,
+    CONF_CREATE_TRAIL_ENTITIES,
+    LIFT_ICONS,
     TRAIL_DIFFICULTY,
-    OPENING_STATUS_MAP,
 )
-from .coordinator import JacksonHoleDataUpdateCoordinator
+from .coordinator import JacksonHoleConfigEntry, JacksonHoleCoordinator, entry_config
+from .entity import JacksonHoleEntity
 
-_LOGGER = logging.getLogger(__name__)
+# Trail category -> feed key.
+TRAIL_SOURCES = {
+    "winter": "trails",
+    "hiking": "summerHikingTrails",
+    "bike": "summerBikeTrails",
+}
 
 
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback,
+    hass: HomeAssistant,
+    entry: JacksonHoleConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up Jackson Hole binary sensors."""
-    coordinator: JacksonHoleDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
-    entities = []
+    """Set up lift and trail binary sensors."""
+    coordinator = entry.runtime_data
+    config = entry_config(entry)
+    data = coordinator.data
+    entities: list[BinarySensorEntity] = []
 
-    # Add lift entities if enabled
-    if entry.data.get(CONF_CREATE_LIFT_ENTITIES, False):
-        lifts = coordinator.data.get("lifts", {})
-        for lift_slug, lift_data in lifts.items():
-            entities.append(JacksonHoleLiftBinarySensor(coordinator, lift_slug, lift_data))
-
-    # Add trail entities if enabled
-    if entry.data.get(CONF_CREATE_TRAIL_ENTITIES, False):
-        trails = coordinator.data.get("trails", {})
-        for trail_slug, trail_data in trails.items():
-            entities.append(JacksonHoleTrailBinarySensor(coordinator, trail_slug, trail_data, "winter"))
-
-    # Add summer trail entities if enabled
-    if entry.data.get(CONF_CREATE_SUMMER_ENTITIES, False):
-        # Hiking trails
-        hiking_trails = coordinator.data.get("summerHikingTrails", {})
-        for trail_slug, trail_data in hiking_trails.items():
-            entities.append(JacksonHoleTrailBinarySensor(coordinator, trail_slug, trail_data, "hiking"))
-
-        # Bike trails
-        bike_trails = coordinator.data.get("summerBikeTrails", {})
-        for trail_slug, trail_data in bike_trails.items():
-            entities.append(JacksonHoleTrailBinarySensor(coordinator, trail_slug, trail_data, "bike"))
-
+    if config[CONF_CREATE_LIFT_ENTITIES]:
+        entities.extend(
+            JacksonHoleLiftBinarySensor(coordinator, slug, lift)
+            for slug, lift in section(data, "lifts").items()
+            if isinstance(lift, dict)
+        )
+    categories = []
+    if config[CONF_CREATE_TRAIL_ENTITIES]:
+        categories.append("winter")
+    if config[CONF_CREATE_SUMMER_ENTITIES]:
+        categories += ["hiking", "bike"]
+    for category in categories:
+        entities.extend(
+            JacksonHoleTrailBinarySensor(coordinator, slug, trail, category)
+            for slug, trail in section(data, TRAIL_SOURCES[category]).items()
+            if isinstance(trail, dict)
+        )
     async_add_entities(entities)
 
 
-class JacksonHoleLiftBinarySensor(CoordinatorEntity, BinarySensorEntity):
-    """Binary sensor for individual lift."""
+def _with_unit(node: Any, default_unit: str) -> str | None:
+    """Format a measurement as '6000 ft'. The feed sends 0 for unknown."""
+    if not isinstance(node, dict):
+        return None
+    value = to_number(node.get("value"))
+    if not value:
+        return None
+    return f"{value:g} {node.get('unitSymbol') or default_unit}"
 
-    _attr_attribution = ATTRIBUTION
+
+def _add_measures(attributes: dict[str, Any], item: dict[str, Any], fields: dict) -> None:
+    for attr, (key, unit) in fields.items():
+        if (text := _with_unit(item.get(key), unit)) is not None:
+            attributes[attr] = text
+
+
+class JacksonHoleLiftBinarySensor(JacksonHoleEntity, BinarySensorEntity):
+    """On when the lift is running."""
+
+    _attr_translation_key = "lift"
     _attr_device_class = BinarySensorDeviceClass.RUNNING
-    _attr_has_entity_name = True
 
     def __init__(
-        self, coordinator: JacksonHoleDataUpdateCoordinator, lift_slug: str, lift_data: dict,
+        self, coordinator: JacksonHoleCoordinator, slug: str, lift: dict[str, Any]
     ) -> None:
-        """Initialize the sensor."""
-        super().__init__(coordinator)
-        self._lift_slug = lift_slug
-        self._attr_name = f"Lift {lift_data.get('name', lift_slug)}"
-        self._attr_unique_id = f"jackson_hole_lift_{lift_slug}"
-
-        # Set icon based on lift type
-        lift_type = lift_data.get("liftType", "")
-        lift_info = LIFT_TYPE.get(lift_type, {})
-        self._attr_icon = lift_info.get("icon", "mdi:ski-lift")
+        super().__init__(coordinator, f"lift_{slug}")
+        self._slug = slug
+        self._attr_translation_placeholders = {"name": lift.get("name") or slug}
+        self._attr_icon = LIFT_ICONS.get(lift.get("liftType") or "", "mdi:ski-lift")
 
     @property
-    def is_on(self) -> bool:
-        """Return true if lift is open."""
-        try:
-            lifts = self.coordinator.data.get("lifts", {})
-            lift = lifts.get(self._lift_slug, {})
-            status = lift.get("openingStatus", "CLOSED")
-            return OPENING_STATUS_MAP.get(status, "closed") == "open"
-        except (KeyError, TypeError):
-            return False
+    def _lift(self) -> dict[str, Any] | None:
+        lift = section(self.coordinator.data, "lifts").get(self._slug)
+        return lift if isinstance(lift, dict) else None
 
     @property
-    def extra_state_attributes(self):
-        """Return additional attributes."""
-        try:
-            lifts = self.coordinator.data.get("lifts", {})
-            lift = lifts.get(self._lift_slug, {})
-            attributes = {
-                "lift_type": lift.get("liftType"),
-                "message": lift.get("message"),
-                "opening_status": lift.get("openingStatus"),
-            }
+    def available(self) -> bool:
+        return super().available and self._lift is not None
 
-            # Add altitude data
-            departure = lift.get("departureAltitude", {})
-            if departure.get("value"):
-                attributes["departure_altitude"] = f"{departure.get('value')} {departure.get('unitSymbol', 'ft')}"
+    @property
+    def is_on(self) -> bool | None:
+        return is_open(lift.get("openingStatus")) if (lift := self._lift) else None
 
-            arrival = lift.get("arrivalAltitude", {})
-            if arrival.get("value"):
-                attributes["arrival_altitude"] = f"{arrival.get('value')} {arrival.get('unitSymbol', 'ft')}"
-
-            # Add length and speed
-            length = lift.get("length", {})
-            if length.get("value"):
-                attributes["length"] = f"{length.get('value')} {length.get('unitSymbol', 'ft')}"
-
-            speed = lift.get("speed", {})
-            if speed.get("value"):
-                attributes["speed"] = f"{speed.get('value')} {speed.get('unitSymbol', 'mph')}"
-
-            return attributes
-        except (KeyError, TypeError):
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        if (lift := self._lift) is None:
             return {}
-
-    @property
-    def device_info(self):
-        """Return device information."""
-        return {
-            "identifiers": {(DOMAIN, "jackson_hole_resort")},
-            "name": "Jackson Hole Mountain Resort",
-            "manufacturer": MANUFACTURER,
-            "model": MODEL,
+        attributes: dict[str, Any] = {
+            "lift_type": lift.get("liftType"),
+            "message": lift.get("message"),
+            "opening_status": lift.get("openingStatus"),
         }
+        _add_measures(
+            attributes,
+            lift,
+            {
+                "departure_altitude": ("departureAltitude", "ft"),
+                "arrival_altitude": ("arrivalAltitude", "ft"),
+                "length": ("length", "ft"),
+                "speed": ("speed", "ft/sec"),
+            },
+        )
+        return attributes
 
 
-class JacksonHoleTrailBinarySensor(CoordinatorEntity, BinarySensorEntity):
-    """Binary sensor for individual trail."""
+class JacksonHoleTrailBinarySensor(JacksonHoleEntity, BinarySensorEntity):
+    """On when the trail is open."""
 
-    _attr_attribution = ATTRIBUTION
-    _attr_device_class = BinarySensorDeviceClass.RUNNING
-    _attr_has_entity_name = True
+    _attr_translation_key = "trail"
+    _attr_device_class = BinarySensorDeviceClass.OPENING
 
     def __init__(
-        self, coordinator: JacksonHoleDataUpdateCoordinator, trail_slug: str, trail_data: dict, trail_category: str,  # "winter", "hiking", or "bike"
+        self,
+        coordinator: JacksonHoleCoordinator,
+        slug: str,
+        trail: dict[str, Any],
+        category: str,
     ) -> None:
-        """Initialize the sensor."""
-        super().__init__(coordinator)
-        self._trail_slug = trail_slug
-        self._trail_category = trail_category
-        self._attr_name = f"Trail {trail_data.get('name', trail_slug)}"
-        self._attr_unique_id = f"jackson_hole_trail_{trail_category}_{trail_slug}"
-
-        # Set icon based on trail difficulty
-        trail_level = trail_data.get("trailLevel", "")
-        difficulty_info = TRAIL_DIFFICULTY.get(trail_level, {})
-        self._attr_icon = difficulty_info.get("icon", "mdi:ski")
+        super().__init__(coordinator, f"trail_{category}_{slug}")
+        self._slug = slug
+        self._category = category
+        self._attr_translation_placeholders = {"name": trail.get("name") or slug}
+        level = trail.get("trailLevel") or ""
+        self._attr_icon = TRAIL_DIFFICULTY.get(level, {}).get("icon", "mdi:ski")
 
     @property
-    def is_on(self) -> bool:
-        """Return true if trail is open."""
-        try:
-            # Get trail data from appropriate category
-            if self._trail_category == "winter":
-                trails = self.coordinator.data.get("trails", {})
-            elif self._trail_category == "hiking":
-                trails = self.coordinator.data.get("summerHikingTrails", {})
-            else:  # bike
-                trails = self.coordinator.data.get("summerBikeTrails", {})
-
-            trail = trails.get(self._trail_slug, {})
-            status = trail.get("openingStatus", "CLOSED")
-            return OPENING_STATUS_MAP.get(status, "closed") == "open"
-        except (KeyError, TypeError):
-            return False
+    def _trail(self) -> dict[str, Any] | None:
+        trails = section(self.coordinator.data, TRAIL_SOURCES[self._category])
+        trail = trails.get(self._slug)
+        return trail if isinstance(trail, dict) else None
 
     @property
-    def extra_state_attributes(self):
-        """Return additional attributes."""
-        try:
-            # Get trail data from appropriate category
-            if self._trail_category == "winter":
-                trails = self.coordinator.data.get("trails", {})
-            elif self._trail_category == "hiking":
-                trails = self.coordinator.data.get("summerHikingTrails", {})
-            else:  # bike
-                trails = self.coordinator.data.get("summerBikeTrails", {})
+    def available(self) -> bool:
+        return super().available and self._trail is not None
 
-            trail = trails.get(self._trail_slug, {})
-            attributes = {
-                "trail_level": trail.get("trailLevel"),
-                "trail_type": trail.get("trailType"),
-                "grooming_status": trail.get("groomingStatus", ""),
-                "message": trail.get("message"),
-                "opening_status": trail.get("openingStatus"),
-                "category": self._trail_category,
-            }
+    @property
+    def is_on(self) -> bool | None:
+        return is_open(trail.get("openingStatus")) if (trail := self._trail) else None
 
-            # Add altitude data
-            departure = trail.get("departureAltitude", {})
-            if departure.get("value") and int(departure.get("value", 0)) > 0:
-                attributes["departure_altitude"] = f"{departure.get('value')} {departure.get('unitSymbol', 'ft')}"
-
-            arrival = trail.get("arrivalAltitude", {})
-            if arrival.get("value") and int(arrival.get("value", 0)) > 0:
-                attributes["arrival_altitude"] = f"{arrival.get('value')} {arrival.get('unitSymbol', 'ft')}"
-
-            # Add length
-            length = trail.get("length", {})
-            if length.get("value") and int(length.get("value", 0)) > 0:
-                attributes["length"] = f"{length.get('value')} {length.get('unitSymbol', 'ft')}"
-
-            return attributes
-        except (KeyError, TypeError):
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        if (trail := self._trail) is None:
             return {}
-
-    @property
-    def device_info(self):
-        """Return device information."""
-        return {
-            "identifiers": {(DOMAIN, "jackson_hole_resort")},
-            "name": "Jackson Hole Mountain Resort",
-            "manufacturer": MANUFACTURER,
-            "model": MODEL,
+        attributes: dict[str, Any] = {
+            "trail_level": trail.get("trailLevel"),
+            "trail_type": trail.get("trailType"),
+            "grooming_status": trail.get("groomingStatus") or "",
+            "message": trail.get("message"),
+            "opening_status": trail.get("openingStatus"),
+            "category": self._category,
         }
+        _add_measures(
+            attributes,
+            trail,
+            {
+                "departure_altitude": ("departureAltitude", "ft"),
+                "arrival_altitude": ("arrivalAltitude", "ft"),
+                "length": ("length", "ft"),
+            },
+        )
+        return attributes

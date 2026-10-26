@@ -1,0 +1,21 @@
+{
+  "entity": {
+    "camera": {
+      "webcam": { "default": "mdi:webcam" }
+    },
+    "sensor": {
+      "snow_depth_mid_mountain": { "default": "mdi:ruler" },
+      "snow_depth_summit": { "default": "mdi:ruler" },
+      "snowfall_24h": { "default": "mdi:weather-snowy-heavy" },
+      "snowfall_48h": { "default": "mdi:weather-snowy-heavy" },
+      "snowfall_7d": { "default": "mdi:weather-snowy-heavy" },
+      "lift_status": { "default": "mdi:ski-lift" },
+      "trail_status": { "default": "mdi:ski" },
+      "trails_by_difficulty": { "default": "mdi:ski" },
+      "last_snowfall": { "default": "mdi:calendar-clock" },
+      "last_update": { "default": "mdi:update" },
+      "summer_hiking_trails": { "default": "mdi:hiking" },
+      "summer_bike_trails": { "default": "mdi:bike" }
+    }
+  }
+}

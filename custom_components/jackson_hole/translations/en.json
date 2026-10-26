@@ -1,43 +1,88 @@
 {
-    "config": {
-        "step": {
-            "user": {
-                "title": "Configure Jackson Hole Mountain Resort",
-                "description": "Set up your Jackson Hole Mountain Resort integration. The default API URL should work for most users. Individual trail entities are disabled by default due to the large number (130+) of trails.",
-                "data": {
-                    "api_url": "API URL",
-                    "update_interval": "Update interval (minutes)",
-                    "create_lift_entities": "Create individual lift entities (13 lifts)",
-                    "create_trail_entities": "Create individual trail entities (130+ trails)",
-                    "create_summer_entities": "Create summer trail entities (hiking/biking)",
-                    "create_weather_entity": "Create weather entity with forecast",
-                    "create_webcam_entities": "Create webcam camera entities"
-                }
-            }
+  "config": {
+    "step": {
+      "user": {
+        "title": "Jackson Hole Mountain Resort",
+        "description": "Reads the resort's public mountain data feed. Trail entities add about 145 entities, so they are off by default.",
+        "data": {
+          "api_url": "API URL",
+          "update_interval": "Update interval (minutes)",
+          "create_lift_entities": "Create an entity for each lift",
+          "create_trail_entities": "Create an entity for each trail",
+          "create_summer_entities": "Create summer hiking and bike trail entities",
+          "create_weather_entity": "Create a weather entity with the daily forecast",
+          "create_webcam_entities": "Create a camera for each webcam"
         },
-        "error": {
-            "cannot_connect": "Failed to connect to the API. Please check the URL and try again.",
-            "unknown": "An unexpected error occurred. Please check the logs."
-        },
-        "abort": {
-            "already_configured": "This integration is already configured. Only one instance is allowed."
+        "data_description": {
+          "api_url": "Must be https. Leave the default unless the resort moves its feed.",
+          "update_interval": "How often to fetch the feed, 5 to 60 minutes."
         }
+      }
     },
-    "options": {
-        "step": {
-            "init": {
-                "title": "Configure Jackson Hole Options",
-                "description": "Update your Jackson Hole Mountain Resort integration settings. Changing entity creation options requires reloading the integration.",
-                "data": {
-                    "api_url": "API URL",
-                    "update_interval": "Update interval (minutes)",
-                    "create_lift_entities": "Create individual lift entities",
-                    "create_trail_entities": "Create individual trail entities",
-                    "create_summer_entities": "Create summer trail entities",
-                    "create_weather_entity": "Create weather entity",
-                    "create_webcam_entities": "Create webcam entities"
-                }
-            }
-        }
+    "error": {
+      "invalid_url": "This is not a valid URL.",
+      "https_required": "The API URL must start with https://.",
+      "cannot_connect": "Could not read the feed. Check the URL and try again.",
+      "response_too_large": "The response is over 2 MB, so it is not the resort feed."
+    },
+    "abort": {
+      "already_configured": "Jackson Hole Mountain Resort is already set up.",
+      "single_instance_allowed": "Jackson Hole Mountain Resort is already set up."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Jackson Hole Mountain Resort options",
+        "description": "Saving reloads the integration. Turning a group off removes its entities.",
+        "data": {
+          "api_url": "API URL",
+          "update_interval": "Update interval (minutes)",
+          "create_lift_entities": "Create an entity for each lift",
+          "create_trail_entities": "Create an entity for each trail",
+          "create_summer_entities": "Create summer hiking and bike trail entities",
+          "create_weather_entity": "Create a weather entity with the daily forecast",
+          "create_webcam_entities": "Create a camera for each webcam"
+        }
+      }
+    },
+    "error": {
+      "invalid_url": "This is not a valid URL.",
+      "https_required": "The API URL must start with https://.",
+      "cannot_connect": "Could not read the feed. Check the URL and try again.",
+      "response_too_large": "The response is over 2 MB, so it is not the resort feed."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "lift": { "name": "Lift {name}" },
+      "trail": { "name": "Trail {name}" }
+    },
+    "camera": {
+      "webcam": { "name": "Webcam {name}" }
+    },
+    "sensor": {
+      "snow_depth_mid_mountain": { "name": "Snow depth mid-mountain" },
+      "snow_depth_summit": { "name": "Snow depth summit" },
+      "snowfall_24h": { "name": "24 hour snowfall" },
+      "snowfall_48h": { "name": "48 hour snowfall" },
+      "snowfall_7d": { "name": "7 day snowfall" },
+      "temperature_base": { "name": "Temperature base" },
+      "temperature_mid_mountain": { "name": "Temperature mid-mountain" },
+      "temperature_summit": { "name": "Temperature summit" },
+      "wind_base": { "name": "Wind base" },
+      "wind_mid_mountain": { "name": "Wind mid-mountain" },
+      "wind_summit": { "name": "Wind summit" },
+      "lift_status": { "name": "Lift status" },
+      "trail_status": { "name": "Trail status" },
+      "trails_by_difficulty": { "name": "Trails by difficulty" },
+      "last_snowfall": { "name": "Last snowfall" },
+      "last_update": { "name": "Last update" },
+      "summer_hiking_trails": { "name": "Summer hiking trails" },
+      "summer_bike_trails": { "name": "Summer bike trails" }
+    },
+    "weather": {
+      "weather": { "name": "Weather" }
+    }
+  }
 }

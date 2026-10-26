@@ -1,90 +1,118 @@
-"""Jackson Hole Mountain Resort integration for Home Assistant."""
+"""The Jackson Hole Mountain Resort integration."""
 from __future__ import annotations
-import logging
-from datetime import timedelta
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.typing import ConfigType
 
+import logging
+import re
+from typing import Any
+
+from homeassistant.const import Platform
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
+
+from .api import webcam_keys
 from .const import (
-    DOMAIN,
-    CONF_UPDATE_INTERVAL,
     CONF_CREATE_LIFT_ENTITIES,
-    CONF_CREATE_TRAIL_ENTITIES,
     CONF_CREATE_SUMMER_ENTITIES,
+    CONF_CREATE_TRAIL_ENTITIES,
     CONF_CREATE_WEATHER_ENTITY,
     CONF_CREATE_WEBCAM_ENTITIES,
-    DEFAULT_UPDATE_INTERVAL,
+    DOMAIN,
 )
-from .coordinator import JacksonHoleDataUpdateCoordinator
+from .coordinator import JacksonHoleConfigEntry, JacksonHoleCoordinator, entry_config
 
 _LOGGER = logging.getLogger(__name__)
 
-# Determine which platforms to load based on configuration
-PLATFORMS: list[Platform] = [Platform.SENSOR]  # Always load sensors
+# Every platform loads; each one decides which entities to add from the
+# entry settings. Unload then always matches what was set up.
+PLATFORMS = [Platform.BINARY_SENSOR, Platform.CAMERA, Platform.SENSOR, Platform.WEATHER]
+
+LEGACY_PREFIX = "jackson_hole_"
+LEGACY_WEBCAM = re.compile(r"webcam_(\d+)")
 
 
-async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Set up the Jackson Hole component."""
-    hass.data.setdefault(DOMAIN, {})
-    return True
-
-
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up Jackson Hole from a config entry."""
-    # Create coordinator
-    update_interval = entry.data.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
-    coordinator = JacksonHoleDataUpdateCoordinator(
-        hass, entry.data, timedelta(minutes=update_interval),
-    )
-
-    # Fetch initial data
+async def async_setup_entry(hass: HomeAssistant, entry: JacksonHoleConfigEntry) -> bool:
+    """Set up Jackson Hole Mountain Resort from a config entry."""
+    coordinator = JacksonHoleCoordinator(hass, entry)
     await coordinator.async_config_entry_first_refresh()
+    entry.runtime_data = coordinator
 
-    # Store coordinator
-    hass.data[DOMAIN][entry.entry_id] = coordinator
+    await _async_migrate_unique_ids(hass, entry, coordinator.data)
+    _async_remove_disabled_entities(hass, entry)
 
-    # Determine platforms to load
-    platforms = [Platform.SENSOR]  # Always have sensors
-
-    if entry.data.get(CONF_CREATE_LIFT_ENTITIES) or entry.data.get(CONF_CREATE_TRAIL_ENTITIES):
-        platforms.append(Platform.BINARY_SENSOR)
-
-    if entry.data.get(CONF_CREATE_WEATHER_ENTITY):
-        platforms.append(Platform.WEATHER)
-
-    if entry.data.get(CONF_CREATE_WEBCAM_ENTITIES):
-        platforms.append(Platform.CAMERA)
-
-    # Set up platforms
-    await hass.config_entries.async_forward_entry_setups(entry, platforms)
-
-    # Set up options update listener
-    entry.async_on_unload(entry.add_update_listener(update_listener))
-
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Unload a config entry."""
-    # Determine which platforms were loaded
-    platforms = [Platform.SENSOR]
-    if entry.data.get(CONF_CREATE_LIFT_ENTITIES) or entry.data.get(CONF_CREATE_TRAIL_ENTITIES):
-        platforms.append(Platform.BINARY_SENSOR)
-    if entry.data.get(CONF_CREATE_WEATHER_ENTITY):
-        platforms.append(Platform.WEATHER)
-    if entry.data.get(CONF_CREATE_WEBCAM_ENTITIES):
-        platforms.append(Platform.CAMERA)
-
-    # Unload platforms
-    unload_ok = await hass.config_entries.async_unload_platforms(entry, platforms)
-    if unload_ok:
-        hass.data[DOMAIN].pop(entry.entry_id)
-
-    return unload_ok
-
-
-async def update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Handle options update."""
+async def _async_update_listener(hass: HomeAssistant, entry: JacksonHoleConfigEntry) -> None:
     await hass.config_entries.async_reload(entry.entry_id)
+
+
+async def async_unload_entry(hass: HomeAssistant, entry: JacksonHoleConfigEntry) -> bool:
+    """Unload a config entry."""
+    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+
+async def _async_migrate_unique_ids(
+    hass: HomeAssistant, entry: JacksonHoleConfigEntry, data: dict[str, Any]
+) -> None:
+    """Move pre-2.0 unique_ids to entry-scoped ids.
+
+    Old ids were 'jackson_hole_<key>'. Webcams used their position in the
+    feed list, which breaks when the resort reorders cameras, so they move
+    to a key built from the caption at that position today.
+    """
+    registry = er.async_get(hass)
+    cams = webcam_keys(data.get("webcams"))
+    prefix = entry.entry_id
+
+    @callback
+    def _migrate(entity: er.RegistryEntry) -> dict[str, str] | None:
+        old = entity.unique_id
+        if not old.startswith(LEGACY_PREFIX):
+            return None
+        key = old.removeprefix(LEGACY_PREFIX)
+        if match := LEGACY_WEBCAM.fullmatch(key):
+            index = int(match.group(1))
+            if index >= len(cams):
+                return None
+            key = f"webcam_{cams[index]}"
+        new = f"{prefix}_{key}"
+        if registry.async_get_entity_id(entity.domain, DOMAIN, new):
+            _LOGGER.warning(
+                "Not migrating %s: unique_id %s is already in use", entity.entity_id, new
+            )
+            return None
+        _LOGGER.debug("Migrating %s unique_id %s -> %s", entity.entity_id, old, new)
+        return {"new_unique_id": new}
+
+    await er.async_migrate_entries(hass, entry.entry_id, _migrate)
+
+
+@callback
+def _async_remove_disabled_entities(hass: HomeAssistant, entry: JacksonHoleConfigEntry) -> None:
+    """Drop entities for groups the user turned off in options."""
+    config = entry_config(entry)
+    eid = entry.entry_id
+    dropped: list[str] = []
+    if not config[CONF_CREATE_LIFT_ENTITIES]:
+        dropped.append(f"{eid}_lift_")
+    if not config[CONF_CREATE_TRAIL_ENTITIES]:
+        dropped.append(f"{eid}_trail_winter_")
+    if not config[CONF_CREATE_SUMMER_ENTITIES]:
+        dropped += [
+            f"{eid}_trail_hiking_",
+            f"{eid}_trail_bike_",
+            f"{eid}_summer_hiking_trails",
+            f"{eid}_summer_bike_trails",
+        ]
+    if not config[CONF_CREATE_WEATHER_ENTITY]:
+        dropped.append(f"{eid}_weather")
+    if not config[CONF_CREATE_WEBCAM_ENTITIES]:
+        dropped.append(f"{eid}_webcam_")
+    if not dropped:
+        return
+    registry = er.async_get(hass)
+    for entity in er.async_entries_for_config_entry(registry, eid):
+        if entity.unique_id.startswith(tuple(dropped)):
+            registry.async_remove(entity.entity_id)
