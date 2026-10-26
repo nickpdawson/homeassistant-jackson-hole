@@ -1,471 +1,238 @@
-"""Sensor platform for Jackson Hole Mountain Resort."""
+"""Sensors for Jackson Hole Mountain Resort."""
 from __future__ import annotations
-from datetime import datetime
-import logging
+
+from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import date, datetime
 from typing import Any
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
+    SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     UnitOfLength,
+    UnitOfPrecipitationDepth,
     UnitOfSpeed,
     UnitOfTemperature,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .const import (
-    DOMAIN,
-    MANUFACTURER,
-    MODEL,
-    ATTRIBUTION,
-    TRAIL_DIFFICULTY,
-)
-from .coordinator import JacksonHoleDataUpdateCoordinator
+from .api import is_open, measure, parse_date, parse_timestamp, section, to_int
+from .const import CONF_CREATE_SUMMER_ENTITIES, TRAIL_DIFFICULTY
+from .coordinator import JacksonHoleConfigEntry, JacksonHoleCoordinator, entry_config
+from .entity import JacksonHoleEntity
 
-_LOGGER = logging.getLogger(__name__)
+type Data = dict[str, Any]
+
+# Feed location key -> name used in the old entity names.
+SNOW_LOCATIONS = {"midMountain": "mid_mountain", "tramSummit": "summit"}
+WEATHER_LOCATIONS = {"base": "base", "midMountain": "mid_mountain", "tramSummit": "summit"}
+# Snowfall is reported at mid-mountain.
+SNOWFALL_FIELDS = {"24h": "newSnowLast24H", "48h": "newSnowLast48H", "7d": "newSnowLast7D"}
+
+
+@dataclass(frozen=True, kw_only=True)
+class JacksonHoleSensorDescription(SensorEntityDescription):
+    value_fn: Callable[[Data], float | int | str | date | datetime | None]
+    attrs_fn: Callable[[Data], dict[str, Any]] | None = None
+
+
+def _count(path: str, field: str) -> Callable[[Data], int | None]:
+    return lambda data: to_int(section(data, path).get(field))
+
+
+def _snow_depth_attrs(location: str) -> Callable[[Data], dict[str, Any]]:
+    def attrs(data: Data) -> dict[str, Any]:
+        loc = section(data, "snow", location)
+        return {
+            "location": loc.get("name"),
+            "altitude": measure(loc, "altitude"),
+            "altitude_unit": section(loc, "altitude").get("unit"),
+        }
+
+    return attrs
+
+
+def _lift_attrs(data: Data) -> dict[str, Any]:
+    status = section(data, "liftStatus")
+    return {
+        "total_lifts": to_int(status.get("totalLifts")),
+        "open_lifts": to_int(status.get("openLifts")),
+        "expected_open_lifts": to_int(status.get("expectedOpenLifts")),
+    }
+
+
+def _trail_attrs(data: Data) -> dict[str, Any]:
+    status = section(data, "trailStatus")
+    return {
+        "total_trails": to_int(status.get("totalTrails")),
+        "open_trails": to_int(status.get("openTrails")),
+        "groomed_trails": to_int(status.get("groomedTrails")),
+        "total_parks": to_int(status.get("totalParks")),
+        "open_parks": to_int(status.get("openParks")),
+    }
+
+
+def _difficulty_attrs(data: Data) -> dict[str, Any]:
+    totals: dict[str, int] = {}
+    opened: dict[str, int] = {}
+    groomed: dict[str, int] = {}
+    for trail in section(data, "trails").values():
+        if not isinstance(trail, dict):
+            continue
+        level = trail.get("trailLevel") or "UNKNOWN"
+        totals[level] = totals.get(level, 0) + 1
+        if is_open(trail.get("openingStatus")):
+            opened[level] = opened.get(level, 0) + 1
+        if trail.get("groomingStatus"):
+            groomed[level] = groomed.get(level, 0) + 1
+    attributes: dict[str, Any] = {}
+    for level, count in totals.items():
+        name = TRAIL_DIFFICULTY.get(level, {}).get("name", level).lower().replace(" ", "_")
+        attributes[f"{name}_total"] = count
+        attributes[f"{name}_open"] = opened.get(level, 0)
+        attributes[f"{name}_groomed"] = groomed.get(level, 0)
+    return attributes
+
+
+def _summer_attrs(kind: str) -> Callable[[Data], dict[str, Any]]:
+    def attrs(data: Data) -> dict[str, Any]:
+        status = section(data, "summerTrailStatus")
+        return {
+            f"total_{kind}_trails": to_int(status.get(f"total{kind.title()}Trails")),
+            f"open_{kind}_trails": to_int(status.get(f"open{kind.title()}Trails")),
+        }
+
+    return attrs
+
+
+SENSORS: list[JacksonHoleSensorDescription] = [
+    *(
+        JacksonHoleSensorDescription(
+            key=f"snow_depth_{loc}",
+            translation_key=f"snow_depth_{name}",
+            device_class=SensorDeviceClass.DISTANCE,
+            state_class=SensorStateClass.MEASUREMENT,
+            native_unit_of_measurement=UnitOfLength.INCHES,
+            value_fn=lambda data, loc=loc: measure(data, "snow", loc, "totalSnowDepth"),
+            attrs_fn=_snow_depth_attrs(loc),
+        )
+        for loc, name in SNOW_LOCATIONS.items()
+    ),
+    *(
+        JacksonHoleSensorDescription(
+            key=f"snowfall_{period}",
+            translation_key=f"snowfall_{period}",
+            device_class=SensorDeviceClass.PRECIPITATION,
+            state_class=SensorStateClass.MEASUREMENT,
+            native_unit_of_measurement=UnitOfPrecipitationDepth.INCHES,
+            value_fn=lambda data, field=field: measure(data, "snow", "midMountain", field),
+        )
+        for period, field in SNOWFALL_FIELDS.items()
+    ),
+    *(
+        JacksonHoleSensorDescription(
+            key=f"temperature_{loc}",
+            translation_key=f"temperature_{name}",
+            device_class=SensorDeviceClass.TEMPERATURE,
+            state_class=SensorStateClass.MEASUREMENT,
+            native_unit_of_measurement=UnitOfTemperature.FAHRENHEIT,
+            value_fn=lambda data, loc=loc: measure(data, "weather", loc, "temperature"),
+        )
+        for loc, name in WEATHER_LOCATIONS.items()
+    ),
+    *(
+        JacksonHoleSensorDescription(
+            key=f"wind_{loc}",
+            translation_key=f"wind_{name}",
+            device_class=SensorDeviceClass.WIND_SPEED,
+            state_class=SensorStateClass.MEASUREMENT,
+            native_unit_of_measurement=UnitOfSpeed.MILES_PER_HOUR,
+            value_fn=lambda data, loc=loc: measure(data, "weather", loc, "wind"),
+        )
+        for loc, name in WEATHER_LOCATIONS.items()
+    ),
+    JacksonHoleSensorDescription(
+        key="lift_status",
+        translation_key="lift_status",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=_count("liftStatus", "openLifts"),
+        attrs_fn=_lift_attrs,
+    ),
+    JacksonHoleSensorDescription(
+        key="trail_status",
+        translation_key="trail_status",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=_count("trailStatus", "openTrails"),
+        attrs_fn=_trail_attrs,
+    ),
+    JacksonHoleSensorDescription(
+        key="trails_by_difficulty",
+        translation_key="trails_by_difficulty",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=_count("trailStatus", "totalTrails"),
+        attrs_fn=_difficulty_attrs,
+    ),
+    JacksonHoleSensorDescription(
+        key="last_snowfall",
+        translation_key="last_snowfall",
+        device_class=SensorDeviceClass.DATE,
+        value_fn=lambda data: parse_date(data.get("lastSnowFallDate")),
+    ),
+    JacksonHoleSensorDescription(
+        key="last_update",
+        translation_key="last_update",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        value_fn=lambda data: parse_timestamp(data.get("respTimestamp")),
+    ),
+]
+
+SUMMER_SENSORS: list[JacksonHoleSensorDescription] = [
+    JacksonHoleSensorDescription(
+        key=f"summer_{kind}_trails",
+        translation_key=f"summer_{kind}_trails",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=_count("summerTrailStatus", f"open{kind.title()}Trails"),
+        attrs_fn=_summer_attrs(kind),
+    )
+    for kind in ("hiking", "bike")
+]
 
 
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback,
+    hass: HomeAssistant,
+    entry: JacksonHoleConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up Jackson Hole sensors."""
-    coordinator: JacksonHoleDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
-
-    entities = [
-        # Snow depth sensors
-        JacksonHoleSnowDepthSensor(coordinator, "midMountain", "Mid-Mountain"),
-        JacksonHoleSnowDepthSensor(coordinator, "tramSummit", "Summit"),
-        # Snowfall sensors
-        JacksonHoleSnowfallSensor(coordinator, "24h", "24 Hour"),
-        JacksonHoleSnowfallSensor(coordinator, "48h", "48 Hour"),
-        JacksonHoleSnowfallSensor(coordinator, "7d", "7 Day"),
-        # Temperature sensors
-        JacksonHoleTemperatureSensor(coordinator, "base", "Base"),
-        JacksonHoleTemperatureSensor(coordinator, "midMountain", "Mid-Mountain"),
-        JacksonHoleTemperatureSensor(coordinator, "tramSummit", "Summit"),
-        # Wind sensors
-        JacksonHoleWindSensor(coordinator, "base", "Base"),
-        JacksonHoleWindSensor(coordinator, "midMountain", "Mid-Mountain"),
-        JacksonHoleWindSensor(coordinator, "tramSummit", "Summit"),
-        # Status sensors
-        JacksonHoleLiftStatusSensor(coordinator),
-        JacksonHoleTrailStatusSensor(coordinator),
-        JacksonHoleTrailsByDifficultySensor(coordinator),
-        # Info sensors
-        JacksonHoleLastSnowfallSensor(coordinator),
-        JacksonHoleLastUpdateSensor(coordinator),
-    ]
-
-    # Add summer trail sensors if enabled
-    if entry.data.get("create_summer_entities", True):
-        entities.extend([
-            JacksonHoleSummerHikingTrailsSensor(coordinator),
-            JacksonHoleSummerBikeTrailsSensor(coordinator),
-        ])
-
-    async_add_entities(entities)
+    coordinator = entry.runtime_data
+    descriptions = list(SENSORS)
+    if entry_config(entry)[CONF_CREATE_SUMMER_ENTITIES]:
+        descriptions += SUMMER_SENSORS
+    async_add_entities(JacksonHoleSensor(coordinator, d) for d in descriptions)
 
 
-class JacksonHoleBaseSensor(CoordinatorEntity, SensorEntity):
-    """Base class for Jackson Hole sensors."""
+class JacksonHoleSensor(JacksonHoleEntity, SensorEntity):
+    """A value read from all.json."""
 
-    _attr_attribution = ATTRIBUTION
-    _attr_has_entity_name = True
+    entity_description: JacksonHoleSensorDescription
 
     def __init__(
-        self, coordinator: JacksonHoleDataUpdateCoordinator, sensor_type: str,
+        self, coordinator: JacksonHoleCoordinator, description: JacksonHoleSensorDescription
     ) -> None:
-        """Initialize the sensor."""
-        super().__init__(coordinator)
-        self._sensor_type = sensor_type
-        self._attr_unique_id = f"jackson_hole_{sensor_type}"
+        super().__init__(coordinator, description.key)
+        self.entity_description = description
 
     @property
-    def device_info(self):
-        """Return device information."""
-        return {
-            "identifiers": {(DOMAIN, "jackson_hole_resort")},
-            "name": "Jackson Hole Mountain Resort",
-            "manufacturer": MANUFACTURER,
-            "model": MODEL,
-        }
-
-
-class JacksonHoleSnowDepthSensor(JacksonHoleBaseSensor):
-    """Snow depth sensor."""
-
-    _attr_device_class = SensorDeviceClass.DISTANCE
-    _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_native_unit_of_measurement = UnitOfLength.INCHES
-    _attr_icon = "mdi:ruler"
-
-    def __init__(
-        self, coordinator: JacksonHoleDataUpdateCoordinator, location: str, location_name: str,
-    ) -> None:
-        """Initialize the sensor."""
-        self._location = location
-        self._location_name = location_name
-        super().__init__(coordinator, f"snow_depth_{location}")
-        self._attr_name = f"Snow Depth {location_name}"
+    def native_value(self) -> float | int | str | date | datetime | None:
+        return self.entity_description.value_fn(self.coordinator.data)
 
     @property
-    def native_value(self) -> float | None:
-        """Return the snow depth."""
-        try:
-            snow_data = self.coordinator.data.get("snow", {})
-            location_data = snow_data.get(self._location, {})
-            depth_data = location_data.get("totalSnowDepth", {})
-            return float(depth_data.get("value", 0))
-        except (KeyError, ValueError, TypeError):
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        if self.entity_description.attrs_fn is None:
             return None
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Return additional attributes."""
-        try:
-            snow_data = self.coordinator.data.get("snow", {})
-            location_data = snow_data.get(self._location, {})
-            return {
-                "location": self._location_name,
-                "altitude": location_data.get("altitude", {}).get("value"),
-                "altitude_unit": location_data.get("altitude", {}).get("unit"),
-            }
-        except (KeyError, TypeError):
-            return {}
-
-
-class JacksonHoleSnowfallSensor(JacksonHoleBaseSensor):
-    """Snowfall accumulation sensor."""
-
-    _attr_device_class = SensorDeviceClass.DISTANCE
-    _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_native_unit_of_measurement = UnitOfLength.INCHES
-    _attr_icon = "mdi:weather-snowy-heavy"
-
-    def __init__(
-        self, coordinator: JacksonHoleDataUpdateCoordinator, period: str, period_name: str,
-    ) -> None:
-        """Initialize the sensor."""
-        self._period = period
-        self._period_name = period_name
-        super().__init__(coordinator, f"snowfall_{period}")
-        self._attr_name = f"{period_name} Snowfall"
-
-    @property
-    def native_value(self) -> float | None:
-        """Return the snowfall amount."""
-        try:
-            snow_data = self.coordinator.data.get("snow", {})
-            # Use mid-mountain as default
-            location_data = snow_data.get("midMountain", {})
-            # Map period to API field
-            field_map = {
-                "24h": "newSnowLast24H",
-                "48h": "newSnowLast48H",
-                "7d": "newSnowLast7D",
-            }
-            field_name = field_map.get(self._period)
-            if field_name:
-                snowfall_data = location_data.get(field_name, {})
-                return float(snowfall_data.get("value", 0))
-            return None
-        except (KeyError, ValueError, TypeError):
-            return None
-
-
-class JacksonHoleTemperatureSensor(JacksonHoleBaseSensor):
-    """Temperature sensor."""
-
-    _attr_device_class = SensorDeviceClass.TEMPERATURE
-    _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_native_unit_of_measurement = UnitOfTemperature.FAHRENHEIT
-    _attr_icon = "mdi:thermometer"
-
-    def __init__(
-        self, coordinator: JacksonHoleDataUpdateCoordinator, location: str, location_name: str,
-    ) -> None:
-        """Initialize the sensor."""
-        self._location = location
-        self._location_name = location_name
-        super().__init__(coordinator, f"temperature_{location}")
-        self._attr_name = f"Temperature {location_name}"
-
-    @property
-    def native_value(self) -> float | None:
-        """Return the temperature."""
-        try:
-            weather_data = self.coordinator.data.get("weather", {})
-            location_data = weather_data.get(self._location, {})
-            temp_data = location_data.get("temperature", {})
-            return float(temp_data.get("value"))
-        except (KeyError, ValueError, TypeError):
-            return None
-
-
-class JacksonHoleWindSensor(JacksonHoleBaseSensor):
-    """Wind speed sensor."""
-
-    _attr_device_class = SensorDeviceClass.WIND_SPEED
-    _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_native_unit_of_measurement = UnitOfSpeed.MILES_PER_HOUR
-    _attr_icon = "mdi:weather-windy"
-
-    def __init__(
-        self, coordinator: JacksonHoleDataUpdateCoordinator, location: str, location_name: str,
-    ) -> None:
-        """Initialize the sensor."""
-        self._location = location
-        self._location_name = location_name
-        super().__init__(coordinator, f"wind_{location}")
-        self._attr_name = f"Wind {location_name}"
-
-    @property
-    def native_value(self) -> float | None:
-        """Return the wind speed."""
-        try:
-            weather_data = self.coordinator.data.get("weather", {})
-            location_data = weather_data.get(self._location, {})
-            wind_data = location_data.get("wind", {})
-            value = wind_data.get("value")
-            return float(value) if value is not None else None
-        except (KeyError, ValueError, TypeError):
-            return None
-
-
-class JacksonHoleLiftStatusSensor(JacksonHoleBaseSensor):
-    """Lift status summary sensor."""
-
-    _attr_icon = "mdi:ski-lift"
-
-    def __init__(self, coordinator: JacksonHoleDataUpdateCoordinator) -> None:
-        """Initialize the sensor."""
-        super().__init__(coordinator, "lift_status")
-        self._attr_name = "Lift Status"
-
-    @property
-    def native_value(self) -> int | None:
-        """Return number of open lifts."""
-        try:
-            lift_status = self.coordinator.data.get("liftStatus", {})
-            return int(lift_status.get("openLifts", 0))
-        except (KeyError, ValueError, TypeError):
-            return None
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Return additional attributes."""
-        try:
-            lift_status = self.coordinator.data.get("liftStatus", {})
-            return {
-                "total_lifts": lift_status.get("totalLifts", 0),
-                "open_lifts": lift_status.get("openLifts", 0),
-                "expected_open_lifts": lift_status.get("expectedOpenLifts", 0),
-            }
-        except (KeyError, TypeError):
-            return {}
-
-
-class JacksonHoleTrailStatusSensor(JacksonHoleBaseSensor):
-    """Trail status summary sensor."""
-
-    _attr_icon = "mdi:ski"
-
-    def __init__(self, coordinator: JacksonHoleDataUpdateCoordinator) -> None:
-        """Initialize the sensor."""
-        super().__init__(coordinator, "trail_status")
-        self._attr_name = "Trail Status"
-
-    @property
-    def native_value(self) -> int | None:
-        """Return number of open trails."""
-        try:
-            trail_status = self.coordinator.data.get("trailStatus", {})
-            return int(trail_status.get("openTrails", 0))
-        except (KeyError, ValueError, TypeError):
-            return None
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Return additional attributes."""
-        try:
-            trail_status = self.coordinator.data.get("trailStatus", {})
-            return {
-                "total_trails": trail_status.get("totalTrails", 0),
-                "open_trails": trail_status.get("openTrails", 0),
-                "groomed_trails": trail_status.get("groomedTrails", 0),
-                "total_parks": trail_status.get("totalParks", 0),
-                "open_parks": trail_status.get("openParks", 0),
-            }
-        except (KeyError, TypeError):
-            return {}
-
-
-class JacksonHoleTrailsByDifficultySensor(JacksonHoleBaseSensor):
-    """Trail breakdown by difficulty sensor."""
-
-    _attr_icon = "mdi:ski"
-
-    def __init__(self, coordinator: JacksonHoleDataUpdateCoordinator) -> None:
-        """Initialize the sensor."""
-        super().__init__(coordinator, "trails_by_difficulty")
-        self._attr_name = "Trails by Difficulty"
-
-    @property
-    def native_value(self) -> int | None:
-        """Return total number of trails."""
-        try:
-            trail_status = self.coordinator.data.get("trailStatus", {})
-            return int(trail_status.get("totalTrails", 0))
-        except (KeyError, ValueError, TypeError):
-            return None
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Return trail breakdown by difficulty."""
-        try:
-            trails = self.coordinator.data.get("trails", {})
-            # Count trails by difficulty
-            difficulty_counts = {}
-            open_counts = {}
-            groomed_counts = {}
-
-            for trail_data in trails.values():
-                level = trail_data.get("trailLevel", "UNKNOWN")
-                status = trail_data.get("openingStatus", "CLOSED")
-                grooming = trail_data.get("groomingStatus", "")
-
-                # Total count
-                difficulty_counts[level] = difficulty_counts.get(level, 0) + 1
-
-                # Open count
-                if status == "OPEN":
-                    open_counts[level] = open_counts.get(level, 0) + 1
-
-                # Groomed count
-                if grooming:
-                    groomed_counts[level] = groomed_counts.get(level, 0) + 1
-
-            # Build attributes with friendly names
-            attributes = {}
-            for level, count in difficulty_counts.items():
-                friendly_name = TRAIL_DIFFICULTY.get(level, {}).get("name", level)
-                attributes[f"{friendly_name.lower().replace(' ', '_')}_total"] = count
-                attributes[f"{friendly_name.lower().replace(' ', '_')}_open"] = open_counts.get(level, 0)
-                attributes[f"{friendly_name.lower().replace(' ', '_')}_groomed"] = groomed_counts.get(level, 0)
-
-            return attributes
-        except (KeyError, TypeError):
-            return {}
-
-
-class JacksonHoleSummerHikingTrailsSensor(JacksonHoleBaseSensor):
-    """Summer hiking trails sensor."""
-
-    _attr_icon = "mdi:hiking"
-
-    def __init__(self, coordinator: JacksonHoleDataUpdateCoordinator) -> None:
-        """Initialize the sensor."""
-        super().__init__(coordinator, "summer_hiking_trails")
-        self._attr_name = "Summer Hiking Trails"
-
-    @property
-    def native_value(self) -> int | None:
-        """Return number of open hiking trails."""
-        try:
-            summer_status = self.coordinator.data.get("summerTrailStatus", {})
-            return int(summer_status.get("openHikingTrails", 0))
-        except (KeyError, ValueError, TypeError):
-            return None
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Return additional attributes."""
-        try:
-            summer_status = self.coordinator.data.get("summerTrailStatus", {})
-            return {
-                "total_hiking_trails": summer_status.get("totalHikingTrails", 0),
-                "open_hiking_trails": summer_status.get("openHikingTrails", 0),
-            }
-        except (KeyError, TypeError):
-            return {}
-
-
-class JacksonHoleSummerBikeTrailsSensor(JacksonHoleBaseSensor):
-    """Summer bike trails sensor."""
-
-    _attr_icon = "mdi:bike"
-
-    def __init__(self, coordinator: JacksonHoleDataUpdateCoordinator) -> None:
-        """Initialize the sensor."""
-        super().__init__(coordinator, "summer_bike_trails")
-        self._attr_name = "Summer Bike Trails"
-
-    @property
-    def native_value(self) -> int | None:
-        """Return number of open bike trails."""
-        try:
-            summer_status = self.coordinator.data.get("summerTrailStatus", {})
-            return int(summer_status.get("openBikeTrails", 0))
-        except (KeyError, ValueError, TypeError):
-            return None
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Return additional attributes."""
-        try:
-            summer_status = self.coordinator.data.get("summerTrailStatus", {})
-            return {
-                "total_bike_trails": summer_status.get("totalBikeTrails", 0),
-                "open_bike_trails": summer_status.get("openBikeTrails", 0),
-            }
-        except (KeyError, TypeError):
-            return {}
-
-
-class JacksonHoleLastSnowfallSensor(JacksonHoleBaseSensor):
-    """Last snowfall date sensor."""
-
-    _attr_device_class = SensorDeviceClass.DATE
-    _attr_icon = "mdi:calendar-clock"
-
-    def __init__(self, coordinator: JacksonHoleDataUpdateCoordinator) -> None:
-        """Initialize the sensor."""
-        super().__init__(coordinator, "last_snowfall")
-        self._attr_name = "Last Snowfall"
-
-    @property
-    def native_value(self) -> str | None:
-        """Return last snowfall date."""
-        try:
-            return self.coordinator.data.get("lastSnowFallDate")
-        except (KeyError, TypeError):
-            return None
-
-
-class JacksonHoleLastUpdateSensor(JacksonHoleBaseSensor):
-    """Last update timestamp sensor."""
-
-    _attr_device_class = SensorDeviceClass.TIMESTAMP
-    _attr_icon = "mdi:update"
-
-    def __init__(self, coordinator: JacksonHoleDataUpdateCoordinator) -> None:
-        """Initialize the sensor."""
-        super().__init__(coordinator, "last_update")
-        self._attr_name = "Last Update"
-
-    @property
-    def native_value(self) -> datetime | None:
-        """Return last update timestamp."""
-        try:
-            timestamp_str = self.coordinator.data.get("respTimestamp")
-            if timestamp_str:
-                return datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
-            return None
-        except (KeyError, ValueError, TypeError):
-            return None
+        return self.entity_description.attrs_fn(self.coordinator.data)
